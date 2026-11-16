@@ -1,0 +1,28 @@
+# Locally derived game assets must not be redistributed.
+hands.bin
+hands.rgba
+hands-source.json
+__pycache__/
+props.bin
+props-*.rgba
+*.bin
+*-source.json
+props-source.json
+
+# Local builds, prepared game assets and capture output
+/build*/
+.venv/
+__pycache__/
+*.pyc
+*.dll
+*.exe
+*.nif
+*.dds
+*.DDS
+*.rgba
+*.bsa
+*.esm
+*.esp
+*.mp4
+*.ppm
+*.log

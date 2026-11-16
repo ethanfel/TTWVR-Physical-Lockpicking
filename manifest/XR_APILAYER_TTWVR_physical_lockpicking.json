@@ -1,0 +1,12 @@
+{
+  "file_format_version": "1.0.0",
+  "api_layer": {
+    "name": "XR_APILAYER_TTWVR_physical_lockpicking",
+    "library_path": "../TTWVRPhysicalLockpicking.dll",
+    "api_version": "1.0",
+    "implementation_version": "1",
+    "description": "Physical lockpicking prototype",
+    "enable_environment": "TTWVR_PHYSICAL_LOCKPICKING",
+    "disable_environment": "DISABLE_TTWVR_PHYSICAL_LOCKPICKING"
+  }
+}

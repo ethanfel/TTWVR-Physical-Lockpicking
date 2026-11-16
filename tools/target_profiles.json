@@ -1,0 +1,71 @@
+[
+  {
+    "kind": 1,
+    "model": "clutter/security/genericsafe01.nif",
+    "anchor": [
+      33.27,
+      -15.203687,
+      31.897454
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "scale": 0.01,
+    "lock_style": 2
+  },
+  {
+    "kind": 2,
+    "model": "clutter/ammo/ammobox01.nif",
+    "anchor": [
+      2.3,
+      -20.96,
+      0.5
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 1
+  },
+  {
+    "kind": 3,
+    "model": "dungeons/office/doors/offdoorsml01.nif",
+    "anchor": [
+      4.031213,
+      -51.23295,
+      82.425599
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "scale": 0.012,
+    "collision_front": -0.013
+  },
+  {
+    "kind": 4,
+    "model": "architecture/urban/buildingkits/schdoorsmr01.nif",
+    "anchor": [
+      4.031189,
+      51.233114,
+      82.425599
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "scale": 0.012,
+    "collision_front": -0.013
+  }
+]
