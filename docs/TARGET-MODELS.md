@@ -1,6 +1,6 @@
 # Displaying the object being lockpicked
 
-**Implementation update (version 20, 2026-11-16):** the four initial model profiles now have a private asset converter, bounded cache, native target selection, tool/body clearance and native-success-gated Open tracks. See the [preparation and limitations](../README.md#target-objects-version-20). The study below records the broader design; texture swaps, additional models, exact animated collision and manual opening remain future work. The display ends with the native lock menu, so the complete long door animation is not held on screen.
+**Implementation update (version 20, 2026-11-16):** the four initial model profiles now have a private asset converter, bounded cache, native target selection, tool/body clearance and native-success-gated Open tracks. See the [preparation and limitations](REFERENCE.md#target-objects-version-20). The study below records the broader design; texture swaps, additional models, exact animated collision and manual opening remain future work. The display ends with the native lock menu, so the complete long door animation is not held on screen.
 
 
 Original feasibility study, 2026-11-16. The study itself made no runtime or installed-addon changes; implementation updates are recorded above and below.

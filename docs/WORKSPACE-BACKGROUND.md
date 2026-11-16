@@ -34,7 +34,7 @@ If a suitable game image is missing, stale, protected or unsupported, the worksp
 
 ## Captures
 
-Version 24's capture tools automatically switch between the game's submitted projection/quad layers and the physical lockpicking workspace. A recording can therefore cover approaching a lock, manipulating it and returning to gameplay. The desktop mirror does not include the separate addon workspace. See [capture usage](../README.md#video-recording).
+Version 24's capture tools automatically switch between the game's submitted projection/quad layers and the physical lockpicking workspace. A recording can therefore cover approaching a lock, manipulating it and returning to gameplay. The desktop mirror does not include the separate addon workspace. See [capture usage](REFERENCE.md#video-recording).
 
 ## Relevant source
 
