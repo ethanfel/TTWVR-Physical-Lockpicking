@@ -4,7 +4,8 @@
 namespace locks {
 void InitKit(void *scripts);
 void ResetKit();
-bool DismissWorldKitMenu(uintptr_t menu);
+bool RequestCloseupExit(uintptr_t menu);
+bool DismissLockMenu(const GameState &g);
 void TickKit(GameState &);
 void KitButtons(unsigned down, unsigned valid, unsigned inRange, int first, unsigned uncertainRelease);
 unsigned KitReach(const GameState &, const Vec hands[2], unsigned valid);

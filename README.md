@@ -22,6 +22,6 @@ The addon takes controller input and haptics from the backend TTWVR selects, inc
 2. Draw with either hand to take a pin. Bend it with both hands, then draw the screwdriver from the same holster with your free hand.
 3. Seat the pin in the keyhole. Press the screwdriver blade into the lower slot and push the handle sideways. If you feel resistance, ease off and adjust the pin. A replacement pin keeps the same sweet spot on that lock.
 
-A picked door stays closed until you open it. Containers open on success. For the close-up interaction with the pin box and screwdriver tin, stow both tools and activate the lock.
+A picked door stays closed until you open it. Containers open on success. For the close-up interaction with the pin box and screwdriver tin, stow both tools and activate the lock. Press **B** on the right Touch controller to leave the close-up.
 
 [Help and removal](docs/help.md) · [Manual setup and building from source](docs/advanced.md) · [GPL-3.0-only](LICENSE)

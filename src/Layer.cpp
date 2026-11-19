@@ -93,6 +93,7 @@ struct Session {
   std::unique_ptr<Renderer> renderer;
   bool focused = false, attached = false, failed = false, positioned = false;
   bool presenting = false, captureInputs = false;
+  bool backDown = false, consumeBack = false, triedExit = false;
   unsigned kitCapture = 0, kitArmed = 0;
   KitControlState kitControls;
   KitWeaponControls kitWeapons;
@@ -1497,6 +1498,7 @@ void UpdateMenu(Session &s, const GameState &g) {
     s.opening = {};
     s.openingTime = 0;
     s.bypassMenu = 0;
+    s.triedExit = false;
     s.interaction.config = {};
     if (auto *file = _wfopen(
             (folder + L"\\TTWVRPhysicalLockpicking.ini").c_str(), L"rb")) {
@@ -1631,9 +1633,8 @@ bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
 }
 void NativeInputFrame(Session &s) {
   auto g = Snapshot();
-  if (!g.menu || !s.focused || !NativeReady() || s.bypassMenu == g.menu ||
-      s.failed || (!s.backend && (!s.localSpace || !s.viewSpace)) || !s.predictedTime ||
-      !ReadyRenderer(s)) {
+  if (!g.menu || !NativeReady() || s.bypassMenu == g.menu || s.failed ||
+      (!s.backend && (!s.localSpace || !s.viewSpace)) || !ReadyRenderer(s)) {
     NativeSceneStop();
     NativeSceneTick(g);
     s.presenting = false;
@@ -1645,9 +1646,13 @@ void NativeInputFrame(Session &s) {
   Control out;
   using Clock = std::chrono::steady_clock;
   auto start = Clock::now();
-  if (!PrepareScene(s, s.predictedTime, g, scene, out)) {
-    NativeSceneStop();
+  if (!s.focused || !s.predictedTime || !PrepareScene(s, s.predictedTime, g, scene, out)) {
+    // Tracking can briefly disappear while the same lock is still open.
+    NativeSceneSuspend();
     NativeSceneTick(g);
+    s.presenting = false;
+    StopFeedback(s);
+    Neutral();
     return;
   }
   auto prepared = Clock::now();
@@ -2193,6 +2198,19 @@ void ProcessHostInput(void *backend, HostPulse pulse, HostFrame &frame, bool val
   RouteKit(s,g,kit,observe,sampling,s.focused);
   if (g.menu || s.presenting) NativeInputFrame(s);
   hostPresented = s.presenting ? g.menu : 0;
+  // Forward a fresh Back press to the stock Exit tile on the game thread. Keep
+  // this press out of the host's Pip-Boy binding until its physical release.
+  if (valid && frame.valid) {
+    const bool down = frame.rightB() != 0;
+    if (!down) s.consumeBack = false;
+    if (down && !s.backDown && s.presenting && g.stage != 7 && !s.triedExit &&
+        RequestCloseupExit(g.menu)) {
+      s.triedExit = true;
+      s.consumeBack = true;
+    }
+    s.backDown = down;
+  }
+  if (s.consumeBack) frame.rightB() = 0;
   if (s.focused) for (int h=0; h<2; ++h) {
     if (s.presenting || (s.kitWeapons.gripMask & (1u<<h))) frame.squeeze[h] = 0;
     if (s.presenting || (s.kitWeapons.triggerMask & (1u<<h))) frame.trigger[h] = 0;

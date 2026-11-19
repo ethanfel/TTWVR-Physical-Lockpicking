@@ -28,7 +28,9 @@ struct Scripts {
 Scripts *api = nullptr;
 void *slotQuery = nullptr, *playQuery = nullptr, *stockQuery = nullptr,
      *drop = nullptr;
-void *assignPin = nullptr, *closeLockMenu = nullptr, *holsterWeapon = nullptr;
+void *assignPin = nullptr, *holsterWeapon = nullptr;
+std::atomic<void *> closeLockMenu{nullptr};
+std::atomic<uintptr_t> closeupExitRequest{0};
 std::atomic<unsigned> occupiedHands{0};
 // These three TTWVR callers read only the per-hand loot preference from the
 // config pointer. The VR settings screen continues to use the real config.
@@ -418,7 +420,18 @@ void KitButtons(unsigned down, unsigned valid, unsigned inRange, int first, unsi
   unsigned bits = down | (valid << 2) | (inRange << 4) | (unsigned(first == 1) << 6);
   sample.store(KitInputSample::make(GetTickCount64(), bits, uncertainRelease));
 }
-bool DismissWorldKitMenu(uintptr_t menu) {
+bool RequestCloseupExit(uintptr_t menu) {
+  if (!menu || !closeLockMenu.load()) return false;
+  closeupExitRequest.store(menu);
+  return true;
+}
+bool DismissLockMenu(const GameState &g) {
+  const uintptr_t menu = g.menu;
+  if (const auto requested = closeupExitRequest.exchange(0); requested && requested == menu && g.stage != 7) {
+    run(closeLockMenu);
+    Log("closeup_exit menu=%08x source=right_b", unsigned(menu));
+    return true;
+  }
   // A scripted Activate can bypass ShowOff's pre-activation event. Use the
   // native Exit button before publishing this menu to the VR workspace.
   static uintptr_t pending = 0;

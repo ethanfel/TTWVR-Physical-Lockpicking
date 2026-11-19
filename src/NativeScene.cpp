@@ -34,7 +34,7 @@ struct Packet {
   GameState game;
   Scene scene;
   SceneGeometry mesh;
-  uint64_t stamp = 0, serial = 0;
+  uint64_t serial = 0;
 };
 Packet packet;
 Mat xrToWorld;
@@ -504,10 +504,16 @@ void NativeSceneTick(const GameState &g) {
   if (GetCurrentThreadId() != gameThread)
     return;
   std::lock_guard guard(mutex);
-  if (!g.menu || !packet.game.menu || g.menu != packet.game.menu ||
-      g.target != packet.game.target || GetTickCount64() - packet.stamp > 150) {
+  // A slow frame does not close the lock menu. The workspace belongs to the
+  // open menu and target; controller freshness is checked separately in Current().
+  if (!g.menu || !g.target || g.menu != packet.game.menu ||
+      g.target != packet.game.target || g.targetRefId != packet.game.targetRefId) {
     releaseScene();
     failed = false;
+    return;
+  }
+  if (!packet.serial) {
+    if (root) hide(root, true);
     return;
   }
   if (failed || !calibrated || applied == packet.serial)
@@ -515,7 +521,8 @@ void NativeSceneTick(const GameState &g) {
   unsigned k = packet.scene.targetKind;
   if (root && (menu != g.menu || kind != k || owner != g.target))
     releaseScene();
-  if (!root && !prepare(g, k)) {
+  const bool firstFrame = !root;
+  if (firstFrame && !prepare(g, k)) {
     Log("native_scene_failure reason=attach");
     releaseScene();
     failed = true;
@@ -529,7 +536,7 @@ void NativeSceneTick(const GameState &g) {
   }
   applied = packet.serial;
   presented = g.menu;
-  if (applied % 180 == 0)
+  if (firstFrame || applied % 180 == 0)
     Log("native_scene_frame serial=%llu dynamic_vertices=%u applied=1 game_thread=1",
         (unsigned long long)applied, unsigned(packet.mesh.vertices.size()));
 }
@@ -537,7 +544,7 @@ bool NativeScenePublish(const GameState &g, const Scene &scene,
                         SceneGeometry &&mesh) {
   {
     std::lock_guard guard(mutex);
-    packet = {g, scene, std::move(mesh), GetTickCount64(), ++serial};
+    packet = {g, scene, std::move(mesh), ++serial};
   }
   if (GetCurrentThreadId() == gameThread)
     NativeSceneTick(g);
@@ -568,6 +575,11 @@ bool WorldToTracking(Vec point, Vec &tracking) {
   if(!calibrated || !finite(point)) return false;
   tracking=xrToWorld.transpose().apply(point-xrOrigin)*(1.f/units);
   return finite(tracking);
+}
+void NativeSceneSuspend() {
+  std::lock_guard guard(mutex);
+  packet.serial = 0;
+  presented = 0;
 }
 void NativeSceneStop() {
   std::lock_guard guard(mutex);

@@ -7,6 +7,7 @@ void InitNativeScene(void *scripts);
 void NativeSceneTick(const GameState &state);
 void NativeSceneCalibration(Pose rightEye);
 bool NativeScenePublish(const GameState &, const Scene &, SceneGeometry &&);
+void NativeSceneSuspend();
 void NativeSceneStop();
 bool NativeScenePresented(uintptr_t menu);
 } // namespace locks

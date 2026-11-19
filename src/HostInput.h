@@ -23,12 +23,15 @@ struct HostFrame {
   struct { HostPose pose; float fov[4]; } eyes[2];
   float sticks[4], trigger[2], squeeze[2];
   uint8_t buttons[12], valid, padding[3];
+  // Touch right B / the right OpenVR application-menu button.
+  uint8_t &rightB() { return buttons[6]; }
 };
 static_assert(offsetof(HostFrame::Hand, aim) == 0 && offsetof(HostFrame::Hand, grip) == 0x20);
 static_assert(sizeof(HostPose) == 0x20 && offsetof(HostPose, valid) == 0x1c);
 static_assert(sizeof(HostFrame) == 0x130 && offsetof(HostFrame, hands) == 0x20 &&
               offsetof(HostFrame, eyes) == 0xa0 && offsetof(HostFrame, trigger) == 0x110 &&
-              offsetof(HostFrame, squeeze) == 0x118 && offsetof(HostFrame, valid) == 0x12c);
+              offsetof(HostFrame, squeeze) == 0x118 && offsetof(HostFrame, buttons) == 0x120 &&
+              offsetof(HostFrame, valid) == 0x12c);
 using HostPulse = void (__thiscall *)(void *, bool, float, float);
 // Returns whether TTWVR can supply OpenXR input.
 bool InstallHostInput(uintptr_t image, bool version117);

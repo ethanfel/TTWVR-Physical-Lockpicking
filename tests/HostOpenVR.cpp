@@ -51,6 +51,9 @@ void __fastcall projection(void*,void*,int,float *left,float *right,float *top,f
 unsigned __fastcall role(void*,void*,unsigned hand) { return hand; }
 bool __fastcall controller(void*,void*,unsigned index,char *out,unsigned size) {
   assert(size >= 60 && (index==1 || index==2));
+  // SteamVR's application-menu bit on the right hand feeds TTWVR's B action.
+  const uint64_t pressed = index == (polls == 1 ? 1u : 2u) ? 1ull << 1 : 0;
+  std::memcpy(out + 8, &pressed, sizeof(pressed));
   float axes[10]{};
   axes[2] = index==1 ? .75f : .125f;
   axes[4] = index==2 ? .875f : .25f;
@@ -75,6 +78,7 @@ void ProcessHostInput(void *backend,HostPulse pulse,HostFrame &frame,bool valid,
   assert(frame.eyes[0].pose.usable() && frame.eyes[1].pose.usable());
   assert(frame.trigger[0]==.75f && frame.trigger[1]==.125f);
   assert(frame.squeeze[0]==.25f && frame.squeeze[1]==.875f);
+  assert(bool(frame.rightB()) == (polls != 1));
   frame.trigger[0]=0;
   pulse(backend,true,.5f,.02f);
   ++polls;

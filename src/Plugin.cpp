@@ -292,7 +292,7 @@ void __cdecl OnMessage(Message *m) {
     }
     if (completing) return;
   }
-  if (DismissWorldKitMenu(next.menu)) return;
+  if (DismissLockMenu(next)) return;
   UpdateTarget(next);
   UpdateInventory(next);
   TickKit(next);
@@ -329,7 +329,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 80;  // Beta 0.1, revision 6.
+  p->version = 81;  // Beta 0.1, revision 7.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -342,7 +342,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=80 release=\"Beta 0.1\" build=windows-controller-input", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=81 release=\"Beta 0.1\" build=stable-lock-scene", n->runtime);
   InitMotionShaders();
   InitInventory(n->query(6));
   InitKit(n->query(6));
