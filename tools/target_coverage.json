@@ -1,0 +1,668 @@
+[
+  {
+    "model": "clutter/security/genericsafe01.nif",
+    "status": "supported",
+    "kind": 1,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/ammo/ammobox01.nif",
+    "status": "supported",
+    "kind": 2,
+    "category": "CONT"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorsml01.nif",
+    "status": "supported",
+    "kind": 3,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/urban/buildingkits/schdoorsmr01.nif",
+    "status": "supported",
+    "kind": 4,
+    "category": "DOOR"
+  },
+  {
+    "model": "clutter/security/genericsafewall01.nif",
+    "status": "supported",
+    "kind": 5,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/security/genericsafefloor01.nif",
+    "status": "supported",
+    "kind": 6,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/footlocker/footlocker01.nif",
+    "status": "supported",
+    "kind": 7,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/junk/toolbox01.nif",
+    "status": "supported",
+    "kind": 8,
+    "category": "CONT"
+  },
+  {
+    "model": "architecture/barracks/barracksdoor.nif",
+    "status": "supported",
+    "kind": 9,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/megaton/interior/shackinteriors/shackexitdoorreg01.nif",
+    "status": "supported",
+    "kind": 10,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/megaton/metalscrapdoor01.nif",
+    "status": "supported",
+    "kind": 11,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/megaton/ramshacklebusdoor01.nif",
+    "status": "supported",
+    "kind": 12,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/megaton/ramshacklescrapdoor01.nif",
+    "status": "supported",
+    "kind": 13,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/nellis afb/nvnelliscratesmall.nif",
+    "status": "supported",
+    "kind": 14,
+    "category": "CONT"
+  },
+  {
+    "model": "architecture/nipton/nv_nipton-town-hall_door.nif",
+    "status": "supported",
+    "kind": 15,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/suburban/suburbanranchdoordestroy.nif",
+    "status": "unsupported",
+    "category": "DOOR",
+    "reason": "Fallen/destroyed door lies flat and has no functioning attached leaf"
+  },
+  {
+    "model": "architecture/urban/bld08valksdoor02.nif",
+    "status": "supported",
+    "kind": 16,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/urban/hotelroof/hotelelevatordoor01.nif",
+    "status": "supported",
+    "kind": 17,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/urban/hotelroof/hotelelevatordoor02.nif",
+    "status": "supported",
+    "kind": 18,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/urban/streetdressing/maildropbox01.nif",
+    "status": "supported",
+    "kind": 19,
+    "category": "CONT"
+  },
+  {
+    "model": "architecture/wasteland/ghdoor.nif",
+    "status": "supported",
+    "kind": 20,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/wasteland/nvranchhouseextdoor.nif",
+    "status": "supported",
+    "kind": 21,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/wasteland/sewerentrancedoor01.nif",
+    "status": "unsupported",
+    "category": "DOOR",
+    "reason": "Wire grille; no solid latch plate at the accessible face"
+  },
+  {
+    "model": "architecture/wasteland/wastelandhomeext05.nif",
+    "status": "unsupported",
+    "reason": "Whole-building container; no accessible container lid or door mount",
+    "category": "CONT"
+  },
+  {
+    "model": "architecture/wasteland/wastelandhomeextdoor.nif",
+    "status": "supported",
+    "kind": 22,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/wasteland/wastelandhomeextdoorint.nif",
+    "status": "supported",
+    "kind": 23,
+    "category": "DOOR"
+  },
+  {
+    "model": "architecture/wasteland/woodshackdoor.nif",
+    "status": "supported",
+    "kind": 24,
+    "category": "DOOR"
+  },
+  {
+    "model": "clutter/bathroom/bathroomstalldoor01.nif",
+    "status": "supported",
+    "kind": 25,
+    "category": "DOOR"
+  },
+  {
+    "model": "clutter/briefcasedetonator/briefcasedetonator01.nif",
+    "status": "supported",
+    "kind": 26,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/chest/steamertrunk01.nif",
+    "status": "supported",
+    "kind": 27,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/clfence/clfacadeexgate01.nif",
+    "status": "supported",
+    "kind": 28,
+    "category": "DOOR"
+  },
+  {
+    "model": "clutter/clfence/clfencegate01.nif",
+    "status": "supported",
+    "kind": 29,
+    "category": "DOOR"
+  },
+  {
+    "model": "clutter/clfence/clfencegateroad01.nif",
+    "status": "unsupported",
+    "reason": "Large wire road gate needs a dedicated latch/chain mount",
+    "category": "DOOR"
+  },
+  {
+    "model": "clutter/dumpster/dumpster02.nif",
+    "status": "supported",
+    "kind": 30,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/enclaveencampment/deathclawcagedoor.nif",
+    "status": "unsupported",
+    "reason": "Open bars without a separate accessible latch surface",
+    "category": "DOOR"
+  },
+  {
+    "model": "clutter/enclaveencampment/enclavecrate01.nif",
+    "status": "supported",
+    "kind": 31,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/fence/nv_fencepickburntgate01.nif",
+    "status": "unsupported",
+    "category": "DOOR",
+    "reason": "Broken picket gate has no continuous latch/mount surface"
+  },
+  {
+    "model": "clutter/fridge/fridgeclosed01.nif",
+    "status": "supported",
+    "kind": 32,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/grocery/cashregister01.nif",
+    "status": "supported",
+    "kind": 33,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/guncabinet/guncabinet01.nif",
+    "status": "supported",
+    "kind": 34,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/health/firstaidkit01.nif",
+    "status": "supported",
+    "kind": 35,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/junk/nv_gscratetall.nif",
+    "status": "supported",
+    "kind": 36,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/lockercabinet01.nif",
+    "status": "supported",
+    "kind": 37,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/lockercabinet02.nif",
+    "status": "supported",
+    "kind": 38,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/office/framedquote01.nif",
+    "status": "unsupported",
+    "reason": "Concealed wall cache: visible picture is not the locking mechanism",
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/office/metalbox01.nif",
+    "status": "supported",
+    "kind": 39,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/questitems/nukafridge01clean.nif",
+    "status": "supported",
+    "kind": 40,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/school/locker01.nif",
+    "status": "supported",
+    "kind": 41,
+    "category": "CONT"
+  },
+  {
+    "model": "clutter/vendortrunk/vendortrunk01.nif",
+    "status": "supported",
+    "kind": 42,
+    "category": "CONT"
+  },
+  {
+    "model": "dlc03/architecture/dlc03cellardoor.nif",
+    "status": "supported",
+    "kind": 43,
+    "category": "DOOR"
+  },
+  {
+    "model": "dlc04/architecture/backwoodshacks/dlc04shackdoorbasement01.nif",
+    "status": "supported",
+    "kind": 44,
+    "category": "DOOR"
+  },
+  {
+    "model": "dlcpitt/architecture/scaffoldkit/dlcpittscf_door.nif",
+    "status": "supported",
+    "kind": 45,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/caves/cavedoor01.nif",
+    "status": "supported",
+    "kind": 46,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/caves/cavedoor02.nif",
+    "status": "unsupported",
+    "reason": "Irregular cave barrier has no reliable closed panel mount",
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/caves/doors/cavedoortocave.nif",
+    "status": "supported",
+    "kind": 47,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/caves/lamplight/lamplightsouvenirdoor.nif",
+    "status": "supported",
+    "kind": 48,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/enclave/accessories/lockerenclave01.nif",
+    "status": "supported",
+    "kind": 49,
+    "category": "CONT"
+  },
+  {
+    "model": "dungeons/enclave/rooms/ecvdoorbg01.nif",
+    "status": "supported",
+    "kind": 50,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/genericdun/doors/nv_doorbig01.nif",
+    "status": "supported",
+    "kind": 51,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/industrial/exterior/inddoorbg01.nif",
+    "status": "supported",
+    "kind": 52,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/industrial/exterior/inddoorsmanim01.nif",
+    "status": "supported",
+    "kind": 53,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/nv_craftsmanhomesinterior/nvcraftsmanrmdooranimated.nif",
+    "status": "supported",
+    "kind": 54,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/nv_ushome/ushomdor01.nif",
+    "status": "supported",
+    "kind": 55,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/nvgamorrah/nvgomorrahdoor01.nif",
+    "status": "supported",
+    "kind": 56,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/nvgamorrah/nvgomorrahintwidedoor01.nif",
+    "status": "supported",
+    "kind": 57,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorbarssml01.nif",
+    "status": "supported",
+    "kind": 58,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorbarssmr01.nif",
+    "status": "supported",
+    "kind": 59,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorbig01.nif",
+    "status": "supported",
+    "kind": 60,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorbigbroke03.nif",
+    "status": "supported",
+    "kind": 61,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorbigmetal01.nif",
+    "status": "supported",
+    "kind": 62,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorhotelblanksml01.nif",
+    "status": "supported",
+    "kind": 63,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorhotelblanksmr01.nif",
+    "status": "supported",
+    "kind": 64,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorhotelsml01.nif",
+    "status": "supported",
+    "kind": 65,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorhotelsml02.nif",
+    "status": "supported",
+    "kind": 66,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorhotelsmr01.nif",
+    "status": "supported",
+    "kind": 67,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorhotelsmr02.nif",
+    "status": "supported",
+    "kind": 68,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoormetaldoor01exterior.nif",
+    "status": "supported",
+    "kind": 69,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoormetalframestatic.nif",
+    "status": "unsupported",
+    "reason": "Frame only; no door leaf to carry a lock",
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoormetalsml01.nif",
+    "status": "supported",
+    "kind": 70,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoormetalsmr01.nif",
+    "status": "supported",
+    "kind": 71,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorsml02.nif",
+    "status": "supported",
+    "kind": 72,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorsmr01.nif",
+    "status": "supported",
+    "kind": 73,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/doors/offdoorsmr02.nif",
+    "status": "supported",
+    "kind": 74,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/office/jail/jaildoor01.nif",
+    "status": "supported",
+    "kind": 75,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/pipe/lpipedoor01.nif",
+    "status": "unsupported",
+    "reason": "Long pipe assembly exceeds the bounded close-up workspace",
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/rivetcity/roomsmall/rcsmdoor01.nif",
+    "status": "supported",
+    "kind": 76,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/rivetcity/roomsmall/rcsmdoorload l.nif",
+    "status": "supported",
+    "kind": 77,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/utility/rooms/utldoor01.nif",
+    "status": "supported",
+    "kind": 78,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/utility/rooms/utldoorbg01.nif",
+    "status": "supported",
+    "kind": 79,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vault/accessories/lockervault01.nif",
+    "status": "supported",
+    "kind": 80,
+    "category": "CONT"
+  },
+  {
+    "model": "dungeons/vault/doors/vdoorsliding01.nif",
+    "status": "supported",
+    "kind": 81,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vault/doors/vdoorsliding02.nif",
+    "status": "supported",
+    "kind": 82,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vault/doors/vdoorslidingoff01.nif",
+    "status": "supported",
+    "kind": 83,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vault/halls/vdoor01.nif",
+    "status": "supported",
+    "kind": 84,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vaultruined/accessories/lockervaultr01.nif",
+    "status": "supported",
+    "kind": 85,
+    "category": "CONT"
+  },
+  {
+    "model": "dungeons/vaultruined/clutter/deskwoodtopr01.nif",
+    "status": "supported",
+    "kind": 86,
+    "category": "CONT"
+  },
+  {
+    "model": "dungeons/vaultruined/doors/vdoorr01.nif",
+    "status": "supported",
+    "kind": 87,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vaultruined/doors/vdoorslidingrr01.nif",
+    "status": "supported",
+    "kind": 88,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vaultruined/doors/vdoorslidingrr02.nif",
+    "status": "supported",
+    "kind": 89,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault01.nif",
+    "status": "supported",
+    "kind": 90,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault02.nif",
+    "status": "supported",
+    "kind": 91,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault03.nif",
+    "status": "supported",
+    "kind": 92,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault04.nif",
+    "status": "supported",
+    "kind": 93,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault106.nif",
+    "status": "supported",
+    "kind": 94,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault87.nif",
+    "status": "supported",
+    "kind": 95,
+    "category": "DOOR"
+  },
+  {
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault92.nif",
+    "status": "supported",
+    "kind": 96,
+    "category": "DOOR"
+  },
+  {
+    "model": "furniture/hotel/hotelwardrobe.nif",
+    "status": "supported",
+    "kind": 97,
+    "category": "CONT"
+  },
+  {
+    "model": "furniture/officeruined/cabinet01.nif",
+    "status": "supported",
+    "kind": 98,
+    "category": "CONT"
+  },
+  {
+    "model": "furniture/officeruined/desk01.nif",
+    "status": "supported",
+    "kind": 99,
+    "category": "CONT"
+  },
+  {
+    "model": "furniture/officeruined/desk01corner.nif",
+    "status": "supported",
+    "kind": 100,
+    "category": "CONT"
+  },
+  {
+    "model": "furniture/vault/vdresser01.nif",
+    "status": "supported",
+    "kind": 101,
+    "category": "CONT"
+  }
+]

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "PinSearch.h"
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -7,11 +8,14 @@
 namespace locks {
 struct Ergonomics {
   float lockDistance = .42f, lockBelowEyes = .42f;
-  float fullTurnWrist = 40.f;
+  float fullTurnWrist = 40.f; // parsed for old INIs; lever input ignores it
+  float pinSearchDegrees = 270.f;
+  bool nativeScene = false;
   bool useTargetObject = true;
   bool useGameProps = true, useGameBackground = true;
   float backgroundBlur = 12.f, backgroundBrightness = .35f;
   bool requirePreparation = true, useHolders = true, dropPins = true;
+  bool freeDriver = true;
   float holderSide[2]{-.22f, .22f}, holderBelowEyes[2]{.60f, .60f},
       holderForward[2]{.16f, .16f};
   float handConstraint = .035f, handAngle = 20.f;
@@ -35,12 +39,18 @@ struct Ergonomics {
       std::istringstream number(line.substr(equal + 1));
       if (!(number >> value) || !std::isfinite(value))
         continue;
+      if (key == "NativeSceneRendering")
+        nativeScene = value >= .5f;
       if (key == "LockDistanceMeters")
         lockDistance = std::clamp(value, .25f, .65f);
       if (key == "LockBelowEyesMeters")
         lockBelowEyes = std::clamp(value, .20f, .70f);
       if (key == "FullTurnWristDegrees")
         fullTurnWrist = std::clamp(value, 20.f, 90.f);
+      if (key == "PinSearchDegrees")
+        pinSearchDegrees = pinSearchSpan(value);
+      if (key == "FreeScrewdriver")
+        freeDriver = value >= .5f;
       if (key == "RequirePinPreparation")
         requirePreparation = value >= .5f;
       if (key == "DropPinsToWorld")

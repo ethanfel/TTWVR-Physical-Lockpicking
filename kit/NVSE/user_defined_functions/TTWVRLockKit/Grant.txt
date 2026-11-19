@@ -1,0 +1,7 @@
+ref token
+begin Function {}
+ let token := GetFormFromMod "TTWVRLockKit.esp" "000800"
+ if eval token && !(player.GetItemCount token)
+  player.AddItem token 1 1
+ endif
+end

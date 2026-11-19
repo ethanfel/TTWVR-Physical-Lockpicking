@@ -9,7 +9,7 @@ static std::vector<unsigned char> good() {
     const auto *b = static_cast<const unsigned char *>(p);
     bytes.insert(bytes.end(), b, b + n);
   };
-  add("TTWProp2", 8);
+  add("TTWProp5", 8);
   uint32_t count = PropCount;
   add(&count, 4);
   for (unsigned i = 0; i < PropCount; i++) {
@@ -47,7 +47,7 @@ int main() {
   for (size_t n : {size_t(0), size_t(8), size_t(23), bytes.size() - 1})
     reject({bytes.begin(), bytes.begin() + n});
   auto b = bytes;
-  b[7] = '1';
+  b[7] = '3';
   reject(b);
   b = bytes;
   b[0] = 'X';

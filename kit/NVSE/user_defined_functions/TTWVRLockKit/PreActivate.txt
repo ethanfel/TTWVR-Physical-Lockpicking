@@ -1,0 +1,31 @@
+ref actor
+int allowed
+ref target
+ref completing
+int kind
+int locked
+begin Function {actor allowed}
+ SetFunctionValue allowed
+ if actor != player || allowed == 0
+  return
+ endif
+ let target := GetSelfAlt
+ if target == 0
+  return
+ endif
+ let locked := target.GetLocked
+ if locked == 0
+  return
+ endif
+ let completing := GetModLocalData "TTWVRLockKit.Completing"
+ if completing == target
+  return
+ endif
+ let kind := target.GetType
+ if kind != 27 && kind != 28
+  return
+ endif
+ if eval (ModelHasBlock player "TTWVRKit_0_0") || (ModelHasBlock player "TTWVRKit_1_0") || (ModelHasBlock player "TTWVRKit_0_1") || (ModelHasBlock player "TTWVRKit_1_1")
+  SetFunctionValue 0
+ endif
+end

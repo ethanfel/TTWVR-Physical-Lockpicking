@@ -1,0 +1,43 @@
+ref lockRef
+int taskNumber
+int difficulty
+int currentSkill
+int pins
+int isBlocked
+begin Function {lockRef taskNumber}
+ SetFunctionValue 0
+ if lockRef == 0
+  return
+ endif
+ let isBlocked := lockRef.GetDisabled
+ if isBlocked
+  return
+ endif
+ let isBlocked := lockRef.GetLocked
+ if isBlocked == 0
+  return
+ endif
+ let isBlocked := GetLockedOut lockRef
+ if isBlocked
+  return
+ endif
+ let difficulty := lockRef.GetLockLevel
+ let currentSkill := player.GetAV Lockpick
+ let pins := player.GetItemCount 0000000A
+ if eval difficulty > 100 || difficulty < 0 || currentSkill < difficulty || pins < 1
+  return
+ endif
+ if taskNumber == 1
+  SetModLocalData "TTWVRLockKit.Completing" lockRef
+  lockRef.Activate player
+  SetModLocalData "TTWVRLockKit.Completing" 0
+ elseif taskNumber == 2
+  player.RemoveItem 0000000A 1 1
+  let isBlocked := player.GetItemCount 0000000A
+  if eval isBlocked != pins - 1
+   return
+  endif
+ endif
+ ; Zero also means a compilation/call failure to xNVSE.
+ SetFunctionValue (difficulty + 1)
+end

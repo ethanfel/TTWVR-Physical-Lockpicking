@@ -2,21 +2,9 @@
 #pragma once
 #include "LockStyle.h"
 #include "Props.h"
+#include "LockMesh.h"
 #include "ToolGeometry.h"
 namespace locks {
-// Compact the original plug without narrowing the working slot. Preserve the
-// original UVs and contact/depth plane; correct normals for the piecewise warp.
-inline PropVertex padlockPlugVertex(PropVertex v) {
-  constexpr float keep = .0082f;
-  constexpr float slope = (padPlugRadius - keep) / (lockPlugRadius - keep);
-  float ax = std::abs(v.p.x);
-  float sx = ax <= keep ? 1.f : slope;
-  if (ax > keep)
-    v.p.x = std::copysign(keep + (ax - keep) * slope, v.p.x);
-  v.p.y *= padPlugYScale;
-  v.n = normal({v.n.x / sx, v.n.y / padPlugYScale, v.n.z});
-  return v;
-}
 struct PadlockMesh {
   PropMesh body, shackle, staple;
   static void tri(PropMesh &m, PropVertex a, PropVertex b, PropVertex c) {

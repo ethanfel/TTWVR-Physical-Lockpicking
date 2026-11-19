@@ -94,6 +94,9 @@ for name in [
     "Reset",
     "Enter",
     "Arrive",
+    "WorldInstall",
+    "WorldTick",
+    "WorldActivate",
 ]:
     s = (p / f"NVSE/user_defined_functions/TTWVRLockStage/{name}.txt").read_text()
     assert "{{" not in s and "%n" not in s, (

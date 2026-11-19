@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "Props.h"
+#include "TargetProfiles.h"
 #include "TargetBounds.h"
 #include "ToolGeometry.h"
 #include <string>
 namespace locks {
-constexpr unsigned targetKinds = 4;
 inline unsigned targetKind(std::string path) {
   for (char &c : path) {
     if (c == '/')
@@ -15,12 +15,8 @@ inline unsigned targetKind(std::string path) {
   }
   if (path.rfind("meshes\\", 0) == 0)
     path.erase(0, 7);
-  const char *paths[]{"clutter\\security\\genericsafe01.nif",
-                      "clutter\\ammo\\ammobox01.nif",
-                      "dungeons\\office\\doors\\offdoorsml01.nif",
-                      "architecture\\urban\\buildingkits\\schdoorsmr01.nif"};
   for (unsigned n = 0; n < targetKinds; n++)
-    if (path == paths[n])
+    if (path == targetProfiles[n].path)
       return n + 1;
   return 0;
 }
@@ -61,7 +57,7 @@ inline bool readTarget(FILE *f, unsigned expected, TargetAsset &out) {
   bool styled = memcmp(magic, "TTWTarg2", 8) == 0;
   if ((!styled && memcmp(magic, "TTWTarg1", 8)) || !read(&kind, 4) ||
       kind != expected || !kind || kind > targetKinds || !read(&parts, 4) ||
-      !parts || parts > 32 || !read(&materials, 4) || !materials ||
+      !parts || parts > 128 || !read(&materials, 4) || !materials ||
       materials > 8 || !read(&frames, 4) || frames < 2 || frames > 601 ||
       !read(&duration, 4) || !std::isfinite(duration) || duration < .05f ||
       duration > 10)
@@ -72,8 +68,7 @@ inline bool readTarget(FILE *f, unsigned expected, TargetAsset &out) {
   a.duration = duration;
   uint32_t style = 0;
   if (styled && (!read(&style, 4) || style > unsigned(LockStyle::RoundedSafe) ||
-                 (style == unsigned(LockStyle::Padlock) && kind != 2) ||
-                 (style == unsigned(LockStyle::RoundedSafe) && kind != 1)))
+                 style != targetProfiles[kind - 1].style))
     return false;
   a.bounds.style = LockStyle(style);
   if (!read(&a.bounds.low, 12) || !read(&a.bounds.high, 12) ||
@@ -128,6 +123,9 @@ inline bool readTarget(FILE *f, unsigned expected, TargetAsset &out) {
     return false;
   out = std::move(a);
   return true;
+}
+inline float targetPresentationTime(bool nativeScene, float time) {
+  return nativeScene ? 0.f : time;
 }
 // Native success is the only trigger. Cancellation and pin breakage cannot
 // animate a target, and a new menu always starts with a closed object.

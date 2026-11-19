@@ -13,7 +13,14 @@
       0
     ],
     "scale": 0.01,
-    "lock_style": 2
+    "lock_style": 2,
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "mount_basis": "original shaped lock or clasp",
+    "source_sha256": "073df3efb870c2152054ebc7650dbf1416d17c36b97f3012c32da9da7052c366"
   },
   {
     "kind": 2,
@@ -34,7 +41,9 @@
       -1
     ],
     "scale": 0.012,
-    "lock_style": 1
+    "lock_style": 1,
+    "mount_basis": "original shaped lock or clasp",
+    "source_sha256": "1d60eab280403e83998255aaeb7f86c7c0113ab46b25dc4adeaebecef0964020"
   },
   {
     "kind": 3,
@@ -50,7 +59,18 @@
       0
     ],
     "scale": 0.012,
-    "collision_front": -0.013
+    "collision_front": -0.013,
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "reverse_anchor": [
+      -4.062229,
+      -51.23247,
+      82.427055
+    ],
+    "mount_basis": "original keyplate atlas on both faces"
   },
   {
     "kind": 4,
@@ -66,6 +86,2913 @@
       0
     ],
     "scale": 0.012,
-    "collision_front": -0.013
+    "collision_front": -0.013,
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "reverse_anchor": [
+      -4.062252,
+      51.232634,
+      82.427055
+    ],
+    "mount_basis": "original keyplate atlas on both faces"
+  },
+  {
+    "kind": 5,
+    "model": "clutter/security/genericsafewall01.nif",
+    "anchor": [
+      4.256603,
+      -15.203687,
+      -0.102546
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 2,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original shaped lock or clasp",
+    "category": "CONT",
+    "source_sha256": "532d3d68632e332ab912eac1998afbf310ee3d56fe8da5605d3a34cca3d69988"
+  },
+  {
+    "kind": 6,
+    "model": "clutter/security/genericsafefloor01.nif",
+    "anchor": [
+      0.102546,
+      -15.203687,
+      4.25662
+    ],
+    "axes": [
+      1,
+      0,
+      2
+    ],
+    "signs": [
+      1,
+      -1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 2,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original shaped lock or clasp",
+    "category": "CONT",
+    "source_sha256": "5d4f01e8f5aa663058795f76140e8a94f9b984085dcdb78f7ce2cc15e7d15bb2"
+  },
+  {
+    "kind": 7,
+    "model": "clutter/footlocker/footlocker01.nif",
+    "anchor": [
+      -11.072281,
+      -1.3,
+      16.0
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      -1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original shaped lock or clasp",
+    "category": "CONT",
+    "source_sha256": "21f144a0adcea2008162f1230b224fb8bcd34850a1f03965b1baa32e2739e3af"
+  },
+  {
+    "kind": 8,
+    "model": "clutter/junk/toolbox01.nif",
+    "anchor": [
+      10.722553,
+      -13.116667,
+      -6.4
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "one of two toolbox lid catches on the opening side",
+    "category": "CONT",
+    "source_sha256": "656dd27d4774450e2ba92335243c2cac7ff191262b69f03f29ee7a9ea41dca8a"
+  },
+  {
+    "kind": 9,
+    "model": "architecture/barracks/barracksdoor.nif",
+    "anchor": [
+      -33.669809,
+      -2.509354,
+      84.894154
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "03bf9f167c7d8950adb261f1a0971d03466807ccff21f61ff9a998384bd7b6f0",
+    "reverse_anchor": [
+      -33.669809,
+      2.509354,
+      84.894154
+    ]
+  },
+  {
+    "kind": 10,
+    "model": "architecture/megaton/interior/shackinteriors/shackexitdoorreg01.nif",
+    "anchor": [
+      12.626153,
+      -30.042827,
+      85.614569
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "55a88b9395c5fc0f9a8634a9caf9e98dd56a599711cc33a49c6bc11f1bdfe786",
+    "reverse_anchor": [
+      8.000097,
+      -30.042827,
+      85.614569
+    ]
+  },
+  {
+    "kind": 11,
+    "model": "architecture/megaton/metalscrapdoor01.nif",
+    "anchor": [
+      -0.176563,
+      -39.573621,
+      79.204795
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "79c067d6a10b2f2122c3b27a1769f111d04686c2c355205d7e7479f209171138",
+    "reverse_anchor": [
+      -4.802619,
+      -39.573621,
+      79.204795
+    ]
+  },
+  {
+    "kind": 12,
+    "model": "architecture/megaton/ramshacklebusdoor01.nif",
+    "anchor": [
+      -3.085169,
+      -24.119014,
+      71.57
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "mount aligned to the textured angled leaf",
+    "category": "DOOR",
+    "source_sha256": "3c291340d7caf593b876d98bfc4953dd59f131901b2829439ae4acd57a1aab5c",
+    "basis": [
+      [
+        0.19996001,
+        0.0,
+        -0.97980406
+      ],
+      [
+        -0.97980406,
+        0.0,
+        -0.19996001
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ]
+  },
+  {
+    "kind": 13,
+    "model": "architecture/megaton/ramshacklescrapdoor01.nif",
+    "anchor": [
+      1.98806,
+      -32.942302,
+      83.468058
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "94bfd135f2488dc24d243955b73071065a4b382ca7b2b22be521a9744ce15acb",
+    "reverse_anchor": [
+      -1.835209,
+      -32.942302,
+      83.468058
+    ]
+  },
+  {
+    "kind": 14,
+    "model": "architecture/nellis afb/nvnelliscratesmall.nif",
+    "anchor": [
+      0.0,
+      -40.414597,
+      -6.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "Nellis ammo crate end clasp",
+    "category": "CONT",
+    "source_sha256": "83421c0546f6fa8c9e5277b2c8e5e874202b8666084ae23d6d8d733c410fb5a0"
+  },
+  {
+    "kind": 15,
+    "model": "architecture/nipton/nv_nipton-town-hall_door.nif",
+    "anchor": [
+      -5.929136,
+      -5.9e-05,
+      89.124945
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "3e53252b4bd663c8f14e98aa5b7347a521e1a20e173c8feeecebce730a05e1b3",
+    "reverse_anchor": [
+      -5.929136,
+      6.164059,
+      89.124945
+    ]
+  },
+  {
+    "kind": 16,
+    "model": "architecture/urban/bld08valksdoor02.nif",
+    "anchor": [
+      -19.739595,
+      -5.870899,
+      9.92
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "mount aligned to the textured angled leaf",
+    "category": "DOOR",
+    "source_sha256": "b25eb6907ae623f4635801f47c3f46885f2c02d02f19e598cd44cda5c0ae9c41",
+    "basis": [
+      [
+        -0.91169691,
+        0.0,
+        -0.41086341
+      ],
+      [
+        -0.41086341,
+        0.0,
+        0.91169691
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ]
+  },
+  {
+    "kind": 17,
+    "model": "architecture/urban/hotelroof/hotelelevatordoor01.nif",
+    "anchor": [
+      -8.599997,
+      2.000097,
+      6.560007
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "f9879ca69be9b8b3a90271488c21a4ffade81225faa08e4c5689fe8d2b3b4b00"
+  },
+  {
+    "kind": 18,
+    "model": "architecture/urban/hotelroof/hotelelevatordoor02.nif",
+    "anchor": [
+      -5.200001,
+      8.999978,
+      7.880007
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "128e8e2f32063f81b1c7d5bc5ed8194a5379c6d642ea2e54431a835f0aa41aa2"
+  },
+  {
+    "kind": 19,
+    "model": "architecture/urban/streetdressing/maildropbox01.nif",
+    "anchor": [
+      -24.426021,
+      6.0,
+      3.0
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      -1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "mailbox access door below the letters slot",
+    "category": "CONT",
+    "source_sha256": "efef687ada1d936475c8bd0c8c881ec73ab438c45ee07d3a0cb5e960eb994169"
+  },
+  {
+    "kind": 20,
+    "model": "architecture/wasteland/ghdoor.nif",
+    "anchor": [
+      -25.392162,
+      0.0,
+      75.060473
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "a0b5dc2c898ac52d05a47dca07078d5f2aad6118508897e3ba9c536775c1abc1"
+  },
+  {
+    "kind": 21,
+    "model": "architecture/wasteland/nvranchhouseextdoor.nif",
+    "anchor": [
+      -2.277877,
+      -26.988063,
+      -3.656201
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      -1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "painted side of one-sided leaf; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "0a11ae5f0ac2711439373b4df4dc23d55a6c446587f676747a7b7ffa50aba906"
+  },
+  {
+    "kind": 22,
+    "model": "architecture/wasteland/wastelandhomeextdoor.nif",
+    "anchor": [
+      -2.848483,
+      -35.341289,
+      -16.468836
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      -1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "painted side of one-sided leaf; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "35b41a30453e427ca9f5854e04b1c0bbc91883573122114751df687616a5e190"
+  },
+  {
+    "kind": 23,
+    "model": "architecture/wasteland/wastelandhomeextdoorint.nif",
+    "anchor": [
+      -2.277878,
+      -33.690515,
+      -3.407728
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      -1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "painted side of one-sided leaf; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "cc10e15ddbc4d1e61bc874c2db567c9e16cb6b50143e1f13bb7c197e8ca87f83"
+  },
+  {
+    "kind": 24,
+    "model": "architecture/wasteland/woodshackdoor.nif",
+    "anchor": [
+      -43.22499,
+      2.37685,
+      9.425623
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      -1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "painted side of one-sided leaf; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "7a26c6df0fd50568125da39d5cce5c176f8b84e812fe1fee54e9df0e0747a7e2"
+  },
+  {
+    "kind": 25,
+    "model": "clutter/bathroom/bathroomstalldoor01.nif",
+    "anchor": [
+      -62.101825,
+      -1.078465,
+      -5.58293
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "3dd8f93094321bf968be9f1c64aeab66be4789ed05974e27fdb9af509e5aaeb3",
+    "reverse_anchor": [
+      -62.101825,
+      1.078485,
+      -5.58293
+    ]
+  },
+  {
+    "kind": 26,
+    "model": "clutter/briefcasedetonator/briefcasedetonator01.nif",
+    "anchor": [
+      13.0,
+      -15.050083,
+      1.583333
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount",
+    "category": "CONT",
+    "source_sha256": "485203d10bb0d56f08a97452d3dbb737cc30a5261f9a49bfb5f6c01e8ef081eb"
+  },
+  {
+    "kind": 27,
+    "model": "clutter/chest/steamertrunk01.nif",
+    "anchor": [
+      -24.547649,
+      0.0,
+      19.5
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      -1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "front centre clasp below trunk lid",
+    "category": "CONT",
+    "source_sha256": "df0dfcb081540e01b543a508b64d67d96d91dd28741c991e0b31d52a7c4253d3"
+  },
+  {
+    "kind": 28,
+    "model": "clutter/clfence/clfacadeexgate01.nif",
+    "anchor": [
+      -33.221814,
+      -6.227278,
+      75.220758
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "solid surface at handle/latch/panel",
+    "category": "DOOR",
+    "source_sha256": "ac77e64ae1d8b4f996d4f92b227b6f85f253bdbb8899ac9d8f5c8ab3b3421e3c"
+  },
+  {
+    "kind": 29,
+    "model": "clutter/clfence/clfencegate01.nif",
+    "anchor": [
+      -123.062089,
+      -4.112539,
+      102.729473
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "solid surface at handle/latch/panel",
+    "category": "DOOR",
+    "source_sha256": "47ff1f85eb7fb8369a8a797b11f3838a9fb7d9529bfc8384d4f44e342ab45311"
+  },
+  {
+    "kind": 30,
+    "model": "clutter/dumpster/dumpster02.nif",
+    "anchor": [
+      -54.826309,
+      -8.0,
+      66.0
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      -1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "opening lip of left lid, near middle divider",
+    "category": "CONT",
+    "source_sha256": "f7c1cc81ec1318d1d44fa8e7d101bd54e05a6e74152088a18c9a7338e475398e"
+  },
+  {
+    "kind": 31,
+    "model": "clutter/enclaveencampment/enclavecrate01.nif",
+    "anchor": [
+      23.742128,
+      20.0,
+      19.916667
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "lid lip above solid rail beside grille",
+    "category": "CONT",
+    "source_sha256": "b880234441cefeb7d6e879a4d8378ca53595662872a10b6f00f5da6341eabfc7"
+  },
+  {
+    "kind": 32,
+    "model": "clutter/fridge/fridgeclosed01.nif",
+    "anchor": [
+      -21.0,
+      -17.26554,
+      80.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "door panel below refrigerator pull",
+    "category": "CONT",
+    "source_sha256": "2451c679d478bc5359fe319b11a2c2911ff7d989ebb4e39fad19206809b2b549"
+  },
+  {
+    "kind": 33,
+    "model": "clutter/grocery/cashregister01.nif",
+    "anchor": [
+      0.0,
+      -10.624999,
+      12.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount",
+    "category": "CONT",
+    "source_sha256": "ebf1ef93def9aaad340177920926492b5bf6cfdb26d400869112db31cfbbcc62"
+  },
+  {
+    "kind": 34,
+    "model": "clutter/guncabinet/guncabinet01.nif",
+    "anchor": [
+      0.373918,
+      36.166667,
+      -2.833333
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "solid stile beside cabinet glass",
+    "category": "CONT",
+    "source_sha256": "3437015fd47878b4a431d30c2b847e7ed6bc67b9937a2deb21ce8857d45abba9"
+  },
+  {
+    "kind": 35,
+    "model": "clutter/health/firstaidkit01.nif",
+    "anchor": [
+      4.8,
+      9.050048,
+      9.333333
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      -1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "upper first-aid lid catch",
+    "category": "CONT",
+    "source_sha256": "69c55a7198e1121b25d72196f54d7ef3498bd7eccd060b511c4f8404530ea51e"
+  },
+  {
+    "kind": 36,
+    "model": "clutter/junk/nv_gscratetall.nif",
+    "anchor": [
+      23.770298,
+      0.0,
+      20.833333
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "solid surface at handle/latch/panel",
+    "category": "CONT",
+    "source_sha256": "c6bb84311263d351b625c3a4a977a5679d74057a6d536294cc426ad2091b6108"
+  },
+  {
+    "kind": 37,
+    "model": "clutter/lockercabinet01.nif",
+    "anchor": [
+      -13.0,
+      -20.461736,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "left locker door beside pull",
+    "category": "CONT",
+    "source_sha256": "fba1610fb401f6691b358df8d3295b5fdd3b52d8b28ec870ed09b956c729f358"
+  },
+  {
+    "kind": 38,
+    "model": "clutter/lockercabinet02.nif",
+    "anchor": [
+      13.0,
+      -20.461724,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "right locker door beside pull",
+    "category": "CONT",
+    "source_sha256": "da3cf6a4b7e440a6120a16d6fce269ebcad8ffb5fe87c21ebba7ffca25b016c4"
+  },
+  {
+    "kind": 39,
+    "model": "clutter/office/metalbox01.nif",
+    "anchor": [
+      0.0,
+      -21.337494,
+      28.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "front panel near metal box lid seam",
+    "category": "CONT",
+    "source_sha256": "c4ad7bc62ac5a18637f7748f44366a1ee9498adccb8389d6bbf6a4e5e99741e6"
+  },
+  {
+    "kind": 40,
+    "model": "clutter/questitems/nukafridge01clean.nif",
+    "anchor": [
+      -21.0,
+      -17.265524,
+      80.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "door panel below refrigerator pull",
+    "category": "CONT",
+    "source_sha256": "6b3e91f648713d04a606fc1e2e340b6439e08b31aa4eca6972a95dd58c1c7e65"
+  },
+  {
+    "kind": 41,
+    "model": "clutter/school/locker01.nif",
+    "anchor": [
+      -4.0,
+      0.020319,
+      124.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "solid surface at handle/latch/panel",
+    "category": "CONT",
+    "source_sha256": "4e0d1dffdfd8896a431105c0ffafaa37dba22098a84d8ed90898ef72eebe181a"
+  },
+  {
+    "kind": 42,
+    "model": "clutter/vendortrunk/vendortrunk01.nif",
+    "anchor": [
+      26.070741,
+      1.166667,
+      35.0
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "vendor trunk centre clasp",
+    "category": "CONT",
+    "source_sha256": "c9176868ccf5f0cc43a171460c25f31d0558477d715e04caebe558651ba8b518"
+  },
+  {
+    "kind": 43,
+    "model": "dlc03/architecture/dlc03cellardoor.nif",
+    "anchor": [
+      -3.046398,
+      -45.695985,
+      21.737095
+    ],
+    "axes": [
+      0,
+      1,
+      2
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount",
+    "category": "DOOR",
+    "source_sha256": "ebaedd09947bbfe1d122c83d3715e262e722fb02378e0e340797d6f47acdafeb",
+    "basis": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  {
+    "kind": 44,
+    "model": "dlc04/architecture/backwoodshacks/dlc04shackdoorbasement01.nif",
+    "anchor": [
+      -4.310001,
+      -52.668652,
+      -11.362361
+    ],
+    "axes": [
+      0,
+      1,
+      2
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount",
+    "category": "DOOR",
+    "source_sha256": "d223bc77cfc3f4470ebc96356d638791c9e1bd0db5b30c7a7c4ab0e689bc6ad8",
+    "basis": [
+      [
+        1.0,
+        -5e-08,
+        -1.4e-07
+      ],
+      [
+        0.0,
+        0.93632916,
+        -0.35112349
+      ],
+      [
+        1.5e-07,
+        0.35112349,
+        0.93632916
+      ]
+    ]
+  },
+  {
+    "kind": 45,
+    "model": "dlcpitt/architecture/scaffoldkit/dlcpittscf_door.nif",
+    "anchor": [
+      3.668292,
+      92.767224,
+      -20.122191
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 1,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount",
+    "category": "DOOR",
+    "source_sha256": "304adf26c582fe97ec6c1522e4de8e1b4f0363863c513f04a0b773fd88035316"
+  },
+  {
+    "kind": 46,
+    "model": "dungeons/caves/cavedoor01.nif",
+    "anchor": [
+      -32.791037,
+      -5.000005,
+      70.412659
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "84c006e25cbbef11bd2607cae3453b8e4df2cb1fcbe2e55f1c4716857afbf67e",
+    "reverse_anchor": [
+      -32.791037,
+      2.000082,
+      70.412659
+    ]
+  },
+  {
+    "kind": 47,
+    "model": "dungeons/caves/doors/cavedoortocave.nif",
+    "anchor": [
+      35.261861,
+      -1.351166,
+      76.080394
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "798200233c5d6b35a944d69a10ae7641b8d00473e2d38d0d8a77152afd49d019",
+    "reverse_anchor": [
+      35.261861,
+      1.219147,
+      76.080394
+    ]
+  },
+  {
+    "kind": 48,
+    "model": "dungeons/caves/lamplight/lamplightsouvenirdoor.nif",
+    "anchor": [
+      3.985456,
+      40.864468,
+      81.509764
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "2fc4bf47df2049b830d16dc9e2a683857c920ddb2928401f626c90159c3076ee"
+  },
+  {
+    "kind": 49,
+    "model": "dungeons/enclave/accessories/lockerenclave01.nif",
+    "anchor": [
+      11.0,
+      20.461673,
+      88.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      -1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "front locker panel above the recessed pull",
+    "category": "CONT",
+    "source_sha256": "b958c2305de39f43e8d8fb4de130ec501595a4d7830ab67ef429c87e929a266a"
+  },
+  {
+    "kind": 50,
+    "model": "dungeons/enclave/rooms/ecvdoorbg01.nif",
+    "anchor": [
+      10.000033,
+      -51.0,
+      91.0
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "steel panel beside enclave door centre",
+    "category": "DOOR",
+    "source_sha256": "49cef143834bc1b0cbab82fa06709994a89100bdff88e5e849f744352541ae3e",
+    "reverse_anchor": [
+      -10.000029,
+      -51.0,
+      91.0
+    ]
+  },
+  {
+    "kind": 51,
+    "model": "dungeons/genericdun/doors/nv_doorbig01.nif",
+    "anchor": [
+      1.999966,
+      -5.460022,
+      81.034927
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "196d8755420afbe046d6afeab9c023e07342c2106cfbe3f6e40ab8ff3f7e234c",
+    "reverse_anchor": [
+      -1.99997,
+      -5.460022,
+      81.034927
+    ]
+  },
+  {
+    "kind": 52,
+    "model": "dungeons/industrial/exterior/inddoorbg01.nif",
+    "anchor": [
+      -73.649702,
+      -7.202545,
+      35.126459
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "texture/handle reviewed against rendered model",
+    "category": "DOOR",
+    "source_sha256": "8ef359636fa58d0a9a5c91e82ff27c396bf7d0155d0f03551d53878bcde0d278",
+    "reverse_anchor": [
+      -73.649702,
+      7.202545,
+      35.126459
+    ]
+  },
+  {
+    "kind": 53,
+    "model": "dungeons/industrial/exterior/inddoorsmanim01.nif",
+    "anchor": [
+      -46.080061,
+      -2.312951,
+      89.126483
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "e08eb562d030c19138080af0ea32e8b6cd8ba15b6a9f54b3fa9225fe90213945",
+    "reverse_anchor": [
+      -46.080061,
+      2.313105,
+      89.126483
+    ]
+  },
+  {
+    "kind": 54,
+    "model": "dungeons/nv_craftsmanhomesinterior/nvcraftsmanrmdooranimated.nif",
+    "anchor": [
+      -0.000494,
+      114.757834,
+      86.411735
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "6d3c9586c988a746db1c62e5d18c0d48664c98a613b7d942fec1167f3ca9ff3a",
+    "reverse_anchor": [
+      -5.99902,
+      114.757834,
+      86.411735
+    ]
+  },
+  {
+    "kind": 55,
+    "model": "dungeons/nv_ushome/ushomdor01.nif",
+    "anchor": [
+      2.848476,
+      -35.098538,
+      64.643285
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "ac4e105720e435713130b230e2a73d45afdf9a610f452673bea6275fa28a9260",
+    "reverse_anchor": [
+      -2.848483,
+      -35.098538,
+      64.643285
+    ]
+  },
+  {
+    "kind": 56,
+    "model": "dungeons/nvgamorrah/nvgomorrahdoor01.nif",
+    "anchor": [
+      3.000094,
+      -44.800082,
+      92.719996
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "563b7131fa68fd0aec874f761c71d6ab2264c33fd80f04b42ce1adf995e5e79d",
+    "reverse_anchor": [
+      -3.000054,
+      -44.800082,
+      92.719996
+    ]
+  },
+  {
+    "kind": 57,
+    "model": "dungeons/nvgamorrah/nvgomorrahintwidedoor01.nif",
+    "anchor": [
+      3.303723,
+      -8.960006,
+      86.263331
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "056c5a57efec7566e89609e4318309fdb2880b04f898aad479ae404e4a1858d1",
+    "reverse_anchor": [
+      -2.696417,
+      -8.960006,
+      86.263331
+    ]
+  },
+  {
+    "kind": 58,
+    "model": "dungeons/office/doors/offdoorbarssml01.nif",
+    "anchor": [
+      3.396483,
+      -44.612175,
+      82.719996
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount",
+    "category": "DOOR",
+    "source_sha256": "109cb2b1dac03c3f6ea82a56f8395c395cd19b861b12d7044516bcbc3afa2e21",
+    "reverse_anchor": [
+      -1.312583,
+      -44.612175,
+      82.719996
+    ]
+  },
+  {
+    "kind": 59,
+    "model": "dungeons/office/doors/offdoorbarssmr01.nif",
+    "anchor": [
+      3.395995,
+      45.950092,
+      82.709999
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount",
+    "category": "DOOR",
+    "source_sha256": "341cf05198b1b6d3e3a124907c2066f1cca9ab49cd9004c8f04c737d1a66e810",
+    "reverse_anchor": [
+      -1.313071,
+      45.950092,
+      82.709999
+    ]
+  },
+  {
+    "kind": 60,
+    "model": "dungeons/office/doors/offdoorbig01.nif",
+    "anchor": [
+      3.000061,
+      -5.553462,
+      85.679998
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "e9db4070598f865cc0fbd8041bd0e1514902dcc92872805a130cf26b1b95b889",
+    "reverse_anchor": [
+      -3.00005,
+      -5.553462,
+      85.679998
+    ]
+  },
+  {
+    "kind": 61,
+    "model": "dungeons/office/doors/offdoorbigbroke03.nif",
+    "anchor": [
+      6.527099,
+      8.768783,
+      81.078902
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original keyplate atlas on both faces",
+    "category": "DOOR",
+    "source_sha256": "a1fbcba988c663a5d36d7b59cc952ffeb77174aed62ade6efdb3540ef0ab05fa",
+    "reverse_anchor": [
+      -1.567204,
+      8.76712,
+      81.080627
+    ],
+    "basis": [
+      [
+        -0.02493884,
+        0.05377081,
+        0.99824183
+      ],
+      [
+        0.99968898,
+        0.0013414,
+        0.02490274
+      ],
+      [
+        0.0,
+        0.9985524,
+        -0.05378754
+      ]
+    ]
+  },
+  {
+    "kind": 62,
+    "model": "dungeons/office/doors/offdoorbigmetal01.nif",
+    "anchor": [
+      3.001532,
+      -5.460251,
+      86.263331
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "3b024b2ce389f36954155c9aa8efb7685c7e361fe8b9f864d0b3c18c4540c726",
+    "reverse_anchor": [
+      -3.000088,
+      -5.460251,
+      86.263331
+    ]
+  },
+  {
+    "kind": 63,
+    "model": "dungeons/office/doors/offdoorhotelblanksml01.nif",
+    "anchor": [
+      2.998585,
+      -44.800082,
+      92.719996
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "6d10d538f00df90f642d68bcf2fb6c4c91501eef24c2f8227511d9ec7fa6a6c9",
+    "reverse_anchor": [
+      -3.00008,
+      -44.800082,
+      92.719996
+    ]
+  },
+  {
+    "kind": 64,
+    "model": "dungeons/office/doors/offdoorhotelblanksmr01.nif",
+    "anchor": [
+      2.999544,
+      49.919965,
+      90.959999
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "5e081513859990a6ef00de95004a4860547d158a9d690b1db66663c0bc1eaecd",
+    "reverse_anchor": [
+      -2.999079,
+      49.919965,
+      90.959999
+    ]
+  },
+  {
+    "kind": 65,
+    "model": "dungeons/office/doors/offdoorhotelsml01.nif",
+    "anchor": [
+      2.998585,
+      -44.800082,
+      92.719996
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "119e039c405d9803e3c64260db50bb4119ceeeb8ab3a323b297c5986d61e77c4",
+    "reverse_anchor": [
+      -3.000076,
+      -44.800082,
+      92.719996
+    ]
+  },
+  {
+    "kind": 66,
+    "model": "dungeons/office/doors/offdoorhotelsml02.nif",
+    "anchor": [
+      3.002442,
+      -43.633415,
+      92.719996
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "09ebd37750cc5cf3f9c23e0362ef34ec29b0c0a52f06647d77cf992e869a89df",
+    "reverse_anchor": [
+      -3.000131,
+      -43.633415,
+      92.719996
+    ]
+  },
+  {
+    "kind": 67,
+    "model": "dungeons/office/doors/offdoorhotelsmr01.nif",
+    "anchor": [
+      2.999544,
+      49.919965,
+      90.959999
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "1bde7e34b72f85d92aed36a72d9721c190ed5fcbe94cf607b874fcd053f9af19",
+    "reverse_anchor": [
+      -2.999058,
+      49.919965,
+      90.959999
+    ]
+  },
+  {
+    "kind": 68,
+    "model": "dungeons/office/doors/offdoorhotelsmr02.nif",
+    "anchor": [
+      3.002516,
+      54.586632,
+      90.959999
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "612c11ece16499d61057dfc890379876cd8f1814f259a0b2d5def694462bbec1",
+    "reverse_anchor": [
+      -2.999123,
+      54.586632,
+      90.959999
+    ]
+  },
+  {
+    "kind": 69,
+    "model": "dungeons/office/doors/offdoormetaldoor01exterior.nif",
+    "anchor": [
+      -39.585655,
+      -0.489234,
+      4.780007
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "0240e400639b73f0ed560dce61a3a4c9a18b1b98afd85b126d4b51b36ae889f2"
+  },
+  {
+    "kind": 70,
+    "model": "dungeons/office/doors/offdoormetalsml01.nif",
+    "anchor": [
+      3.002442,
+      -43.633354,
+      92.719996
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "3d4228b03ec6018ce9d2cc5b68076a8aedc441d83872dbe221a55c80a507f2ea",
+    "reverse_anchor": [
+      -3.000131,
+      -43.633354,
+      92.719996
+    ]
+  },
+  {
+    "kind": 71,
+    "model": "dungeons/office/doors/offdoormetalsmr01.nif",
+    "anchor": [
+      3.00188,
+      54.586632,
+      90.959999
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original reviewed mount; deadbolt above handle",
+    "category": "DOOR",
+    "source_sha256": "76db3fa60e478e6a187409a51fe745ed3f5a0f698e36a219a7ea8a07cc193655",
+    "reverse_anchor": [
+      -3.000117,
+      54.586632,
+      90.959999
+    ]
+  },
+  {
+    "kind": 72,
+    "model": "dungeons/office/doors/offdoorsml02.nif",
+    "anchor": [
+      6.527098,
+      -50.781944,
+      81.078902
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original keyplate atlas on both faces",
+    "category": "DOOR",
+    "source_sha256": "656f6b6f4372149fc0279a459803cd2f804a34df56f9f85c9919cf667f1f8b80",
+    "reverse_anchor": [
+      -1.567204,
+      -50.781499,
+      81.080624
+    ],
+    "basis": [
+      [
+        -0.02395501,
+        0.05377208,
+        0.99826586
+      ],
+      [
+        0.99971304,
+        0.00128848,
+        0.02392034
+      ],
+      [
+        0.0,
+        0.9985524,
+        -0.05378752
+      ]
+    ]
+  },
+  {
+    "kind": 73,
+    "model": "dungeons/office/doors/offdoorsmr01.nif",
+    "anchor": [
+      4.031212,
+      51.233114,
+      82.425629
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original keyplate atlas on both faces",
+    "category": "DOOR",
+    "source_sha256": "67caf14979a92666d7b9f6579c6f75f77b2ea4db6ce9fe231e61d8a5ee074fc8",
+    "reverse_anchor": [
+      -4.062229,
+      51.232634,
+      82.427085
+    ]
+  },
+  {
+    "kind": 74,
+    "model": "dungeons/office/doors/offdoorsmr02.nif",
+    "anchor": [
+      15.096151,
+      50.467745,
+      80.992483
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "original keyplate atlas on both faces",
+    "category": "DOOR",
+    "source_sha256": "f34d33a2e8d39c1e6d952e2345bf40af26b566b40efa77c4065128e881e3f56e",
+    "basis": [
+      [
+        0.10309103,
+        0.13580225,
+        0.9853578
+      ],
+      [
+        0.99467193,
+        -0.01407499,
+        -0.10212569
+      ],
+      [
+        -0.0,
+        0.99063598,
+        -0.13652969
+      ]
+    ],
+    "reverse_anchor": [
+      7.000488,
+      50.467427,
+      80.994227
+    ]
+  },
+  {
+    "kind": 75,
+    "model": "dungeons/office/jail/jaildoor01.nif",
+    "anchor": [
+      2.339843,
+      -77.60788,
+      78.860669
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "texture/handle reviewed against rendered model",
+    "category": "DOOR",
+    "source_sha256": "7c562476eb83b2af3cf2323ac2ead0b353542b6d6e19cbef5d6ba457641209f8",
+    "reverse_anchor": [
+      -2.369224,
+      -77.60788,
+      78.860669
+    ]
+  },
+  {
+    "kind": 76,
+    "model": "dungeons/rivetcity/roomsmall/rcsmdoor01.nif",
+    "anchor": [
+      2.56546,
+      -31.583333,
+      95.416667
+    ],
+    "axes": [
+      1,
+      2,
+      0
+    ],
+    "signs": [
+      1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "door plate clear of wheel and clamps",
+    "category": "DOOR",
+    "source_sha256": "92d915e015967904713bd4e68cd733c0bd81949bec39c43c8fce20eb43ca204c",
+    "reverse_anchor": [
+      -8.708295,
+      -31.583333,
+      95.416667
+    ]
+  },
+  {
+    "kind": 77,
+    "model": "dungeons/rivetcity/roomsmall/rcsmdoorload l.nif",
+    "anchor": [
+      -31.583333,
+      -2.948617,
+      95.416667
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "door plate clear of wheel and clamps",
+    "category": "DOOR",
+    "source_sha256": "6ee6769d327c6f9aec9b8fa3d5320662a95a64587aeca684001c7fd37d1fe95d",
+    "reverse_anchor": [
+      -31.583333,
+      8.433462,
+      95.416667
+    ]
+  },
+  {
+    "kind": 78,
+    "model": "dungeons/utility/rooms/utldoor01.nif",
+    "anchor": [
+      -11.5,
+      -1.999906,
+      79.25
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "utility door panel beside gearing",
+    "category": "DOOR",
+    "source_sha256": "e8d3d9644dff5460bbc0b3b15b3a59009b4f55b422f5ed36557be2f190ec7c99",
+    "reverse_anchor": [
+      -11.5,
+      1.999912,
+      79.25
+    ]
+  },
+  {
+    "kind": 79,
+    "model": "dungeons/utility/rooms/utldoorbg01.nif",
+    "anchor": [
+      -15.0,
+      -6.536127,
+      78.666667
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "utility door panel beside gearing",
+    "category": "DOOR",
+    "source_sha256": "8cb5d75637c045c1282e94d5f2a977e8312043b0d71117740173efbe50368bb9",
+    "reverse_anchor": [
+      -15.0,
+      6.536116,
+      78.666667
+    ]
+  },
+  {
+    "kind": 80,
+    "model": "dungeons/vault/accessories/lockervault01.nif",
+    "anchor": [
+      11.0,
+      20.461673,
+      88.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      -1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "front locker panel above the recessed pull",
+    "category": "CONT",
+    "source_sha256": "2fac7562f9d1c72a474c686cbbd46dbe044cfca6d89ab8aa9647d98a6c6c5ab1"
+  },
+  {
+    "kind": 81,
+    "model": "dungeons/vault/doors/vdoorsliding01.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "56b7c0113e9bd15127873576691cd3cdabf3750d68603212d64b5df515e1b889",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 82,
+    "model": "dungeons/vault/doors/vdoorsliding02.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "715f9b0c195209cb79309162a97a83e159e0e66b00ed2cad7ab132b600d0e499",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 83,
+    "model": "dungeons/vault/doors/vdoorslidingoff01.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "e1809b3edd7ffc4ece279c5a9d4221296f525c27626945fd4d463d32724a8ae4",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 84,
+    "model": "dungeons/vault/halls/vdoor01.nif",
+    "anchor": [
+      -24.0,
+      7.711934,
+      117.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "vault leaf clear of moving bolt and handle",
+    "category": "DOOR",
+    "source_sha256": "c4f1d3b08d3c83f698b3893f08aa7638ebc685cc3285d8cdc001cc0c4510ca8c",
+    "reverse_anchor": [
+      -24.0,
+      16.596711,
+      117.0
+    ]
+  },
+  {
+    "kind": 85,
+    "model": "dungeons/vaultruined/accessories/lockervaultr01.nif",
+    "anchor": [
+      11.0,
+      20.461673,
+      88.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      -1,
+      1,
+      1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "front locker panel above the recessed pull",
+    "category": "CONT",
+    "source_sha256": "2ae3ec534e6b476fd14eda3ac384d3f78361b00ef43448300415771365917407"
+  },
+  {
+    "kind": 86,
+    "model": "dungeons/vaultruined/clutter/deskwoodtopr01.nif",
+    "anchor": [
+      41.0,
+      -30.816813,
+      40.5
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "drawer face beside top drawer pull",
+    "category": "CONT",
+    "source_sha256": "200ad318d5c98f9e76d2ccea092c5ecdf00e1ae54215b796d70ff7d224b8cdc9"
+  },
+  {
+    "kind": 87,
+    "model": "dungeons/vaultruined/doors/vdoorr01.nif",
+    "anchor": [
+      -24.0,
+      7.711934,
+      117.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "vault leaf clear of moving bolt and handle",
+    "category": "DOOR",
+    "source_sha256": "aafcc5f187118e4785226fb26943e4fa90fe3ba47a7835a3254ce22bf0e3baf0",
+    "reverse_anchor": [
+      -24.0,
+      16.596711,
+      117.0
+    ]
+  },
+  {
+    "kind": 88,
+    "model": "dungeons/vaultruined/doors/vdoorslidingrr01.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "d5e5e5c2daac396d9fc99f77f47a831b712b8101b1c66f8c6efd529d523c7368",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 89,
+    "model": "dungeons/vaultruined/doors/vdoorslidingrr02.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "c69d623581cf48f4ebf2d586893fa0ffd63a39380b996d61f5b5850f343baf74",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 90,
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault01.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "a4ff6fac98156162791fe4cc84c4d01b99c672a6d9bda6b48f142215a77fde5d",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 91,
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault02.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "dc80dd1cc814deb55247a6cffbf6885d7792129cb92216d027b9438bb0bfb3f6",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 92,
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault03.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "f62321cf0cc6c7a1610a4b65fb49faf2ceab436ead0423661ff0295e8b1147f5",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 93,
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault04.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "a782e63b0ae4f9d3fe389357abf4d89097cef45123deb63b9099420d61caffe5",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 94,
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault106.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "1875827c6aa84154dcc54d608d0d83af0446aad64da4d16edfd27dec2854624a",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 95,
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault87.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "ea3b6d47dbe473c252c975866a96e7ecbd5b93c689633807f7184e4feb3cefce",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 96,
+    "model": "dungeons/vaultruined/doors/vdoorslidingvault92.nif",
+    "anchor": [
+      -23.0,
+      -0.905477,
+      84.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "sliding leaf beside centre stripe",
+    "category": "DOOR",
+    "source_sha256": "e043418eff73400a6235b998d0b8bfa2727df1d7d03508d2c50016542cbbb37c",
+    "reverse_anchor": [
+      -23.0,
+      1.063667,
+      84.0
+    ]
+  },
+  {
+    "kind": 97,
+    "model": "furniture/hotel/hotelwardrobe.nif",
+    "anchor": [
+      -8.0,
+      -14.551843,
+      66.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "wardrobe stile above the knob",
+    "category": "CONT",
+    "source_sha256": "640fb88576a6946ab041e1108b5f52b8476e5e21d8a2f0eccbff289751136186"
+  },
+  {
+    "kind": 98,
+    "model": "furniture/officeruined/cabinet01.nif",
+    "anchor": [
+      10.0,
+      -27.62407,
+      58.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "filing drawer beside pull",
+    "category": "CONT",
+    "source_sha256": "0e37d60706a6ebfa40f6829edd7849eeb14826ac1c5a042b8227fdf6912f8dac"
+  },
+  {
+    "kind": 99,
+    "model": "furniture/officeruined/desk01.nif",
+    "anchor": [
+      45.333333,
+      -31.908891,
+      27.833333
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "upper right drawer beside pull",
+    "category": "CONT",
+    "source_sha256": "066216cbc5161f4019bc9e2f97b98e26cc3b499804da543794d1a7e51f161dc6"
+  },
+  {
+    "kind": 100,
+    "model": "furniture/officeruined/desk01corner.nif",
+    "anchor": [
+      45.916667,
+      -31.908891,
+      27.833333
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "upper right drawer beside pull",
+    "category": "CONT",
+    "source_sha256": "921d509026d9d405c90c49608a15afa20496948dd276f918ffea27de5e721a19"
+  },
+  {
+    "kind": 101,
+    "model": "furniture/vault/vdresser01.nif",
+    "anchor": [
+      12.0,
+      -16.053417,
+      57.0
+    ],
+    "axes": [
+      0,
+      2,
+      1
+    ],
+    "signs": [
+      1,
+      1,
+      -1
+    ],
+    "scale": 0.012,
+    "lock_style": 0,
+    "collision_front": -0.013,
+    "static_scene": true,
+    "mount_basis": "drawer face clear of centre pull",
+    "category": "CONT",
+    "source_sha256": "d37ffaa7fe32351e91403d170b6ad774a609ae504b3bf80f6023b02080011589"
   }
 ]

@@ -45,7 +45,7 @@ inline float capCylinder(float nativeLimit, float handAngle) {
 struct Grab {
   bool armed = false, held = false;
   void reset() { armed = held = false; }
-  bool update(float trigger, bool near) {
+  bool update(float trigger, bool withinReach) {
     if (trigger <= .2f) {
       held = false;
       armed = true;
@@ -53,7 +53,7 @@ struct Grab {
     }
     if (trigger >= .65f && armed) {
       armed = false;
-      held = near;
+      held = withinReach;
       return held;
     }
     return false;

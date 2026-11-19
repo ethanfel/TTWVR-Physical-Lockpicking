@@ -1,0 +1,18 @@
+ref kit
+int slot
+begin Function {}
+ SetFunctionValue -1
+ let kit := GetFormFromMod "TTWVRLockKit.esp" "000800"
+ if eval !kit || !(player.GetItemCount kit) || (player.GetDead)
+  return
+ endif
+ SetFunctionValue 0
+ let slot := 1
+ while slot <= 8
+  if eval (GetHotkeyItem slot) == kit
+   SetFunctionValue slot
+   return
+  endif
+  let slot += 1
+ loop
+end

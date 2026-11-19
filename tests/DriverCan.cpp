@@ -8,6 +8,13 @@ int main() {
   assert(canDistance({0, -.1f, 0}) > 0);
   assert(canDistance({.030f, -.1f, 0}) < 0);
   assert(canDistance({0, .01f, 0}) > 0);
+  for (int i = -40; i <= 40; ++i)
+    for (int j = -165; j <= 10; ++j) {
+      Vec p{i * .001f, j * .001f, .013f}, axial{p.x, p.z, p.y};
+      float reference = std::max(cylinderDistance(axial, .032f, -.155f, -.025f),
+                                 -cylinderDistance(axial, .028f, -.151f, .1f));
+      assert(std::abs(canDistance(p) - reference) < 1e-6f);
+    }
   for (float dt : {1.f / 20, 1.f / 90, 1.f / 180}) {
     PhysicalInteraction t;
     t.update({}, {}, {}, 0, 0, 0, dt);

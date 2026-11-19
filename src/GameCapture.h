@@ -21,14 +21,14 @@ class GameCapture {
   ID3D11DeviceContext *deferred = nullptr;
   ID3D11Texture2D *images[2]{};
   ID3D11RenderTargetView *targets[2]{};
-  unsigned size = 0;
-  bool Init(ID3D11Device *device, unsigned eyeSize);
+  unsigned width = 0, height = 0;
+  bool Init(ID3D11Device *device, unsigned eyeWidth, unsigned eyeHeight);
 
 public:
   ~GameCapture() { Reset(); }
   void Reset();
   ID3D11Texture2D *Draw(ID3D11Device *device, ID3D11DeviceContext *immediate,
-                        unsigned eye, unsigned eyeSize, XrFovf view,
+                        unsigned eye, unsigned eyeWidth, unsigned eyeHeight, XrFovf view,
                         const std::vector<CaptureLayer> &layers);
 };
 } // namespace locks

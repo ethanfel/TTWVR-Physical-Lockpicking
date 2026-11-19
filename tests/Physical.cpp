@@ -64,7 +64,8 @@ int main() {
       assert(close(world(pin, pinHinge(1)), pinPivot()));
       assert(close(pin.p.z, -.041f));
       for (int k = 0; k < 2; k++) {
-        Vec slot = rotate(axisAngle({0, 0, 1}, cylinder * pi / 180), mouth(k));
+        Vec moved = turnWithCylinder({{}, mouth(k)}, cylinder).p;
+        Vec slot = rotate(axisAngle({0, 0, 1}, cylinder * pi / 180), moved);
         assert(std::abs(slot.x) + (k == 0 ? .0014f : .0021f) < .005f);
         assert(std::abs(slot.y) + .0021f < .018f);
       }
@@ -75,8 +76,11 @@ int main() {
         assert(point.z > .024f + .0014f);
       }
     }
+  // Preserve explicit regression coverage for the optional legacy attachment.
+  // FreeDriver.cpp covers the default contact-only mode, including full turns.
   for (int swap = 0; swap < 2; swap++) {
     PhysicalInteraction i;
+    i.config.freeDriver = false;
     i.config.requirePreparation = true;
     i.config.useHolders = false;
     Pose lock, p, d;
@@ -144,11 +148,16 @@ int main() {
            i.tools[1].inserting);
     assert(i.insertedEvents == 1);
     assert(close(i.tools[0].insertProgress, 0)); // no automatic seating push
+    approach(-.065f, 0); // Seat the pin before moving the driver past it.
     approach(-.065f, -.018f);
     assert(i.seated() && i.insertedEvents == 2 && close(i.target, 0));
     step(1, 1);
     assert(i.insertedEvents == 0);
-    // Position, not wrist roll, searches with the pin. Driver remains axial.
+    // Re-grip the supported handle in its lower-slot pose.
+    step(1, 0);
+    d = grip(i.tools[1].pose, 1);
+    step(1, 1);
+    // Position, not wrist roll, searches with the pin. Driver uses handle travel around the plug.
     p.q = multiply(pq, axisAngle({0, 0, 1}, -.4f));
     step(1, 1);
     assert(close(i.pick, 90));
@@ -157,18 +166,23 @@ int main() {
     assert(close(i.pick, 120));
     d.q = multiply(dq, axisAngle({0, 0, 1}, -10 * pi / 180));
     step(1, 1);
+    assert(close(i.target, 0)); // axial twist cannot apply torque
+    Pose leverStart = d;
+    d.p = turnWithCylinder(leverStart, 22.5f).p;
+    step(1, 1);
     assert(close(i.target, 22.5f));
     for (int n = 0; n < 1000; n++)
       step(1, 1, 20, 4);
     assert(close(i.target, 22.5f) && close(i.pick, 120));
-    assert(close(world(i.tools[1].pose, {0, 0, .018f}), mouth(1)));
-    assert(rotate(i.tools[1].pose.q, {0, 0, 1}).y <= .0001f);
-    d.q = multiply(dq, axisAngle({0, 0, 1}, -40 * pi / 180));
+    assert(close(world(i.tools[1].pose, {0, 0, driverInsertionDepth}), turnWithCylinder({{}, mouth(1)},20).p));
+    assert(rotate(inverse(turnWithCylinder({},20).q), rotate(i.tools[1].pose.q, {0, 0, 1})).y <= .0001f);
+    d.p = turnWithCylinder(leverStart, 90).p;
     step(1, 1, 20, 4);
     assert(close(i.target, 90) && close(capCylinder(20, i.target), 20));
     // Release supports both tools, but removes torque immediately.
     step(0, 0, 20, 3);
-    auto pin = i.tools[0].pose.p, driver = i.tools[1].pose.p;
+    auto pin = turnWithCylinder(i.tools[0].pose,-20).p,
+         driver = turnWithCylinder(i.tools[1].pose,-20).p;
     for (int n = 0; n < 90; n++)
       step(0, 0);
     assert(i.seated() && i.pickHand == -1 && i.screwdriverHand == -1);
@@ -182,6 +196,9 @@ int main() {
     step(1, 1);
     assert(close(i.target, 0) && close(i.pick, 120));
     d.q = multiply(d.q, axisAngle({0, 0, 1}, -10 * pi / 180));
+    step(1, 1);
+    assert(close(i.target, 0));
+    d.p = turnWithCylinder(d, 22.5f).p;
     step(1, 1);
     assert(close(i.target, 22.5f));
     // Pulling out retains the hand owner; releasing a loose tool drops it.
@@ -480,7 +497,7 @@ int main() {
       }
     }
   }
-  puts("loose pickup, both-hand insertion, relative wrist control, seated "
+  puts("loose pickup, both-hand insertion, handle leverage, seated "
        "regrip, torque "
        "cancellation, gravity, unobstructed drops, recovery, native "
        "replacement and reset "

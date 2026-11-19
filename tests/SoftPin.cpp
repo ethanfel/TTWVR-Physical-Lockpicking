@@ -92,9 +92,12 @@ int main() {
     p.pinDepth = .03f;
     p.pose = engagedPinPose(90, .03f, 1, 0);
     d.owner = 1;
-    d.pose = aimedTool({{}, {0, -.0027f, .155f}}, mouth(1));
-    Pose hand{axisAngle({0, 0, 1}, -20 * pi / 180), {0, -.0027f, .155f}};
-    d.seatedRadius = length(hand.p - mouth(1));
+    d.pose = d.seatPose = aimedTool({{}, {.07f, -.035f, .15f}}, mouth(1));
+    Pose rest{d.pose.q, world(d.pose, handleCenter(1))};
+    d.leverStartHand = rest.p;
+    d.driverTracking = true; d.driverTracked = rest;
+    Pose hand = rest; hand.p = hand.p + Vec{.012f, -.002f, 0};
+    d.seatedRadius = length(rest.p - mouth(1));
     t.grabs[1].held = true;
     float largest = 0, smallest = 0;
     Pose physics = turnWithCylinder(p.pose, 10);

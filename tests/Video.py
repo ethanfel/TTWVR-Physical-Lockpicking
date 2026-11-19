@@ -1,6 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Guard against stale sessions and partially published stereo frames."""
 import importlib.util
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
 from pathlib import Path
 import struct
 import tempfile
@@ -67,6 +74,79 @@ class StreamTests(unittest.TestCase):
             path.write_bytes(header)
             with self.assertRaises(ValueError):
                 recorder.Stream(path, 'a' * 32)
+
+
+@unittest.skipUnless(os.name == 'posix' and shutil.which('ffmpeg') and shutil.which('ffprobe'),
+                     'Real Ctrl+C process-group check needs POSIX, FFmpeg and ffprobe')
+class RecorderTests(unittest.TestCase):
+    def record(self, seconds=None):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plugins = root / 'plugins'
+            plugins.mkdir()
+            (plugins / 'TTWVRPhysicalLockpicking.dll').touch()
+            output = root / 'clips'
+            cmd = [sys.executable, '-B', recorder.__file__, '--plugins', str(plugins),
+                   '--output', str(output), '--delay', '0', '--wait', '5',
+                   '--fps', '10', '--encoder', 'software']
+            if seconds is not None:
+                cmd += ['--seconds', str(seconds)]
+            with (root / 'recorder.log').open('w+') as log:
+                proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT,
+                                        start_new_session=True)
+                try:
+                    request = plugins / 'lockpick-video.request'
+                    deadline = time.monotonic() + 8
+                    while not request.exists() and proc.poll() is None and time.monotonic() < deadline:
+                        time.sleep(.01)
+                    self.assertTrue(request.exists(), 'Recorder did not request frames')
+                    token = request.read_text().split()[0]
+                    header = bytearray(128)
+                    header[:8] = b'TTWVID1\0'
+                    struct.pack_into('<4I', header, 8, 64, 32, 1, 10)
+                    struct.pack_into('<IIQQ', header, 24, 2, 1, 1000, 1)
+                    header[48:80] = token.encode()
+                    struct.pack_into('<I', header, 80, 1)
+                    # Publish one complete pair; repeating it needs no game/GPU.
+                    (plugins / 'lockpick-video.bin').write_bytes(
+                        header + bytes([80, 120, 160, 255]) * (64 * 32))
+                    while time.monotonic() < deadline:
+                        log.seek(0)
+                        if 'No audio is recorded.' in log.read():
+                            break
+                        self.assertIsNone(proc.poll())
+                        time.sleep(.01)
+                    else:
+                        self.fail('Recorder did not start encoding')
+                    if seconds is None or seconds == 0 or seconds > 600:
+                        time.sleep(.65)
+                        # Terminal Ctrl+C reaches every process in this group.
+                        os.killpg(proc.pid, signal.SIGINT)
+                    proc.wait(timeout=10)
+                    log.seek(0)
+                    self.assertEqual(proc.returncode, 0, log.read())
+                finally:
+                    if proc.poll() is None:
+                        os.killpg(proc.pid, signal.SIGTERM)
+                        proc.wait(timeout=10)
+            stats = json.loads(next(output.glob('*.json')).read_text())
+            self.assertGreater(stats['frames'], 0)
+            self.assertEqual(stats['interrupted'], seconds is None or seconds == 0 or seconds > 600)
+            self.assertFalse(request.exists())
+            self.assertFalse((plugins / 'lockpick-video.recorder-lock').exists())
+            probe = json.loads(subprocess.check_output([
+                'ffprobe', '-v', 'error', '-count_frames', '-select_streams', 'v:0',
+                '-show_entries', 'stream=nb_read_frames', '-of', 'json', stats['file']]))
+            self.assertEqual(int(probe['streams'][0]['nb_read_frames']), stats['frames'])
+            return stats
+
+    def test_unlimited_ctrl_c_saves_and_releases(self):
+        self.record()
+        self.record(0)
+
+    def test_timed_recording_and_long_duration(self):
+        self.assertEqual(self.record(.3)['frames'], 3)
+        self.record(601)
 
 
 if __name__ == '__main__':

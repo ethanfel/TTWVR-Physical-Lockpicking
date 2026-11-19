@@ -36,7 +36,8 @@ int main(int argc, char **argv) {
   assert(targetKind("Meshes/Clutter/Security/GenericSafe01.NIF") == 1);
   assert(targetKind("clutter\\ammo\\ammobox01.nif") == 2);
   assert(!targetKind("../clutter/ammo/ammobox01.nif"));
-  assert(!targetKind("clutter/security/genericsafewall01.nif"));
+  assert(targetKind("clutter/security/genericsafewall01.nif") == 5);
+  for(unsigned n=0;n<targetKinds;n++) assert(targetKind(targetProfiles[n].path)==n+1);
   TargetAsset a;
   FILE *f = fixture();
   assert(readTarget(f, 1, a));
@@ -70,6 +71,8 @@ int main(int argc, char **argv) {
     assert(!readTarget(f, unsigned(pair[0]), a));
     fclose(f);
   }
+  assert(targetPresentationTime(true, 1.f) == 0);
+  assert(targetPresentationTime(false, 1.f) == 1);
   TargetOpening o;
   o.Step(10, 1, 2, 1, 0, .1f);
   assert(!o.opened);

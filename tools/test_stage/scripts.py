@@ -3,6 +3,8 @@
 
 
 def write_scripts(output, m):
+    from world_locks import write_world_scripts
+    write_world_scripts(output, m)
     root = output / "NVSE/user_defined_functions/TTWVRLockStage"
     root.mkdir(parents=True, exist_ok=True)
 
@@ -329,6 +331,7 @@ end""",
     write(
         "Install",
         """begin Function {}
+ Call (CompileScript "TTWVRLockStage/WorldInstall.txt")
  SetEventHandler "OnActivate" (CompileScript "TTWVRLockStage/Control.txt")
  SetGameMainLoopCallback (CompileScript "TTWVRLockStage/Tick.txt") 1 5 3
  SetGameMainLoopCallback (CompileScript "TTWVRLockStage/BonusTick.txt") 1 5 3
@@ -341,4 +344,4 @@ end""",
     )
     config = output / "config"
     config.mkdir(exist_ok=True)
-    (config / "TTWVRLockStage.ini").write_text("[Stage]\nEnter=0\n")
+    (config / "TTWVRLockStage.ini").write_text("[Stage]\nEnter=0\nWorldLocks=1\n")

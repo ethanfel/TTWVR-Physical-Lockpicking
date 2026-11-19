@@ -5,7 +5,7 @@ namespace locks {
 // Read immutable metadata on the game's main loop. These layouts are from
 // xNVSE/JIP for the version already accepted by NVSEPlugin_Query.
 void UpdateTarget(GameState &s) {
-  if (!s.menu || !s.target)
+  if (!s.target)
     return;
   auto *ref = reinterpret_cast<const unsigned char *>(s.target);
   if (!Readable(ref, 0x68))
@@ -14,6 +14,7 @@ void UpdateTarget(GameState &s) {
   if (!Readable(base, 0x18))
     return;
   unsigned type = base[4];
+  s.targetIsDoor = type == 0x1c;
   size_t model = type == 0x1b ? 0x48 : type == 0x1c ? 0x3c : 0;
   if (!model || !Readable(base, model + 0x20))
     return;
@@ -25,8 +26,9 @@ void UpdateTarget(GameState &s) {
     return;
   auto *path = *reinterpret_cast<const char *const *>(base + model + 4);
   std::string name;
+  const bool readablePath = Readable(path, 256);
   for (size_t n = 0; n < 256; n++) {
-    if (!Readable(path + n, 1))
+    if (!readablePath && !Readable(path + n, 1))
       return;
     unsigned char c = path[n];
     if (!c) {

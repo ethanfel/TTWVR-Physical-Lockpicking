@@ -12,8 +12,6 @@ template <class T> void drop(T *&p) {
 }
 } // namespace
 Background::~Background() {
-  while (!copies.empty())
-    Erase(copies.begin()->first);
   drop(vs);
   drop(blur);
   drop(compose);
@@ -24,25 +22,15 @@ Background::~Background() {
     drop(filtered[n]);
     drop(temporary[n]);
   }
-  drop(immediate);
-  drop(device);
 }
-void Background::Erase(XrSwapchain key) {
-  auto it = copies.find(key);
-  if (it == copies.end())
-    return;
-  for (auto *p : it->second.slices)
-    if (p)
-      p->Release();
-  for (auto *p : it->second.textures)
-    if (p)
-      p->Release();
-  copies.erase(it);
+void ReleasedImage::Clear() {
+  frame = 0;
+  for (auto *v : slices) v->Release();
+  for (auto *t : textures) t->Release();
+  slices.clear();
+  textures.clear();
 }
 bool Background::Init(ID3D11Device *d) {
-  device = d;
-  device->AddRef();
-  device->GetImmediateContext(&immediate);
   const char *shader = R"(
 Texture2D image:register(t0); SamplerState linearClamp:register(s0);
 cbuffer Params:register(b0) {
@@ -131,11 +119,9 @@ float4 compose(V v):SV_Target {
   return true;
 }
 
-bool Background::Save(XrSwapchain key, ID3D11Texture2D *image, unsigned frame) {
-  auto previous = copies.find(key);
-  if (previous != copies.end())
-    previous->second.frame = 0;
-  if (!filtered[1] || !image)
+bool ReleasedImage::Save(ID3D11Device *device, ID3D11Texture2D *image, unsigned stamp) {
+  frame = 0;
+  if (!device || !image)
     return false;
   D3D11_TEXTURE2D_DESC d{};
   image->GetDesc(&d);
@@ -145,8 +131,7 @@ bool Background::Save(XrSwapchain key, ID3D11Texture2D *image, unsigned frame) {
       d.Format != DXGI_FORMAT_B8G8R8A8_UNORM_SRGB &&
       d.Format != DXGI_FORMAT_R16G16B16A16_FLOAT)
     return false;
-  auto &c = copies[key];
-  if (c.textures.empty()) {
+  if (textures.empty()) {
     auto owned = d;
     owned.SampleDesc = {1, 0};
     owned.ArraySize = owned.MipLevels = 1;
@@ -157,45 +142,44 @@ bool Background::Save(XrSwapchain key, ID3D11Texture2D *image, unsigned frame) {
       ID3D11Texture2D *texture = nullptr;
       ID3D11ShaderResourceView *srv = nullptr;
       if (FAILED(device->CreateTexture2D(&owned, nullptr, &texture))) {
-        Erase(key);
+        Clear();
         return false;
       }
-      c.textures.push_back(texture);
+      textures.push_back(texture);
       if (FAILED(device->CreateShaderResourceView(texture, nullptr, &srv))) {
-        Erase(key);
+        Clear();
         return false;
       }
-      c.slices.push_back(srv);
+      slices.push_back(srv);
     }
   }
+  ID3D11DeviceContext *immediate = nullptr;
+  device->GetImmediateContext(&immediate);
   for (unsigned n = 0; n < d.ArraySize; n++) {
     unsigned sub = D3D11CalcSubresource(0, n, d.MipLevels);
     if (d.SampleDesc.Count > 1)
-      immediate->ResolveSubresource(c.textures[n], 0, image, sub, d.Format);
+      immediate->ResolveSubresource(textures[n], 0, image, sub, d.Format);
     else
-      immediate->CopySubresourceRegion(c.textures[n], 0, 0, 0, 0, image, sub,
+      immediate->CopySubresourceRegion(textures[n], 0, 0, 0, 0, image, sub,
                                        nullptr);
   }
-  c.frame = frame;
+  immediate->Release();
+  frame = stamp;
   return true;
 }
-BackgroundView Background::View(XrSwapchain key, unsigned slice,
-                                unsigned frame) {
+BackgroundView ReleasedImage::View(unsigned slice, unsigned stamp) const {
   BackgroundView v;
-  auto it = copies.find(key);
-  if (it == copies.end() || it->second.frame != frame ||
-      slice >= it->second.slices.size())
+  if (!stamp || frame != stamp || slice >= slices.size())
     return v;
-  auto &c = it->second;
   D3D11_TEXTURE2D_DESC d{};
-  c.textures[slice]->GetDesc(&d);
-  v.image = c.slices[slice];
+  textures[slice]->GetDesc(&d);
+  v.image = slices[slice];
   v.width = d.Width;
   v.height = d.Height;
   return v;
 }
 bool Background::Draw(ID3D11DeviceContext *ctx, ID3D11RenderTargetView *rtv,
-                      const BackgroundView &s, XrFovf f, unsigned size,
+                      const BackgroundView &s, XrFovf f, unsigned width, unsigned height,
                       float radius, float brightness) {
   if (!filtered[1] || !s.image || !s.width || !s.height)
     return false;
@@ -257,7 +241,7 @@ bool Background::Draw(ID3D11DeviceContext *ctx, ID3D11RenderTargetView *rtv,
   ctx->PSSetShaderResources(0, 1, &filtered[0]);
   ctx->Draw(3, 0);
   ctx->OMSetRenderTargets(1, &rtv, nullptr);
-  viewport.Width = viewport.Height = float(size);
+  viewport.Width = float(width); viewport.Height = float(height);
   ctx->RSSetViewports(1, &viewport);
   ctx->PSSetShader(compose, nullptr, 0);
   ctx->PSSetShaderResources(0, 1, &filtered[1]);

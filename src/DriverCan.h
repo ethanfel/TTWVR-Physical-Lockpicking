@@ -4,9 +4,14 @@
 namespace locks {
 // Same dimensions as the rendered tin. Open top, solid bottom and side wall.
 inline float canDistance(Vec p) {
-  Vec axial{p.x, p.z, p.y};
-  return std::max(cylinderDistance(axial, .032f, -.155f, -.025f),
-                  -cylinderDistance(axial, .028f, -.151f, .1f));
+  float radial = std::sqrt(p.x * p.x + p.z * p.z);
+  auto capped = [&](float radius, float lo, float hi) {
+    float r = radial - radius, y = std::max(lo - p.y, p.y - hi);
+    if (r <= 0 || y <= 0)
+      return std::max(r, y);
+    return std::sqrt(r * r + y * y);
+  };
+  return std::max(capped(.032f, -.155f, -.025f), -capped(.028f, -.151f, .1f));
 }
 inline Vec canNormal(Vec p) {
   constexpr float e = .00005f;
@@ -33,7 +38,11 @@ inline bool contactCan(Pose &pose, Vec &velocity, Vec &angular,
     Vec point{};
     for (size_t n = 0; n < shape.count; ++n) {
       Vec p = world(pose, shape.balls[n].p);
-      float d = canDistance(p - origin) - shape.balls[n].r;
+      float radius = shape.balls[n].r;
+      float y = p.y - origin.y;
+      if (y > -.025f + radius + .00005f || y < -.155f - radius - .00005f)
+        continue;
+      float d = canDistance(p - origin) - radius;
       if (d < deepest) {
         deepest = d;
         point = p;

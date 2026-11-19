@@ -7,11 +7,11 @@ using namespace locks;
 int main() {
   TargetBounds safe;
   safe.style = LockStyle::RoundedSafe;
-  assert(housingDistance({.064f, .064f, 0}, 0, safe) < 0);
-  assert(housingDistance({.064f, .064f, 0}) > 0);
-  assert(housingDistance({.072f, .072f, 0}, 0, safe) > 0);
-  assert(housingDistance({.072f, 0, .010f}, 0, safe) < 0);
-  assert(housingDistance({.072f, 0, safeFront}, 0, safe) > 0); // bevel
+  assert(housingDistance({.064f * lockSizeRatio, .064f * lockSizeRatio, 0}, 0, safe) < 0);
+  assert(housingDistance({.064f * lockSizeRatio, .064f * lockSizeRatio, 0}) > 0);
+  assert(housingDistance({.072f * lockSizeRatio, .072f * lockSizeRatio, 0}, 0, safe) > 0);
+  assert(housingDistance({.072f * lockSizeRatio, 0, .010f}, 0, safe) < 0);
+  assert(housingDistance({.072f * lockSizeRatio, 0, safeFront}, 0, safe) > 0); // bevel
   SafeFrameMesh mesh;
   for (auto v : mesh.body.vertices) {
     assert(finite(v.p) && finite(v.n));
@@ -24,12 +24,12 @@ int main() {
     for (float pick : {0.f, 45.f, 90.f, 135.f, 180.f}) {
       ToolShape pin(0, 1, 0, safe), driver(1, 1, 0, safe);
       assert(pin.clearance(seatedPose(0, pick, angle), angle) > 0);
-      assert(driver.clearance(seatedPose(1, 90, angle), angle) > 0);
+      assert(driver.clearance(turnWithCylinder(seatedPose(1, 90, 0), angle), angle) > 0);
     }
   for (int k = 0; k < 2; k++) {
     ToolShape tool(k, 1, 0, safe);
-    auto c = moveAgainstHousing(tool, {{}, {.064f, .064f, .3f}},
-                                      {{}, {.064f, .064f, -.3f}});
+    auto c = moveAgainstHousing(tool, {{}, {.064f * lockSizeRatio, .064f * lockSizeRatio, .3f}},
+                                      {{}, {.064f * lockSizeRatio, .064f * lockSizeRatio, -.3f}});
     assert(c.hit && tool.clearance(c.pose, 0) >= -.00015f);
     Pose away = c.pose; away.p.z += .12f;
     auto d = moveAgainstHousing(tool, c.pose, away);

@@ -1,0 +1,2 @@
+Call (CompileScript "TTWVRLockKit/Grant.txt")
+SetEventHandlerAlt "ShowOff:OnPreActivate" (CompileScript "TTWVRLockKit/PreActivate.txt") 1::player

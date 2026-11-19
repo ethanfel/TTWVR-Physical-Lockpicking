@@ -14,6 +14,7 @@ import json
 import struct
 from pathlib import Path
 from prepare_hands import NifFormat, bsa_file, matrix, np, Image
+from pin_mesh import wire_mesh, dimensions
 
 
 def mesh(data, name, world=False):
@@ -30,6 +31,37 @@ def mesh(data, name, world=False):
         )[:, :3]
     uv = np.array([[v.u, v.v] for v in g.data.uv_sets[0]])
     return p, uv, np.array(list(g.data.get_triangles()), dtype=np.uint32)
+
+
+def source_normals(data, name, world=False):
+    g = next(
+        b
+        for b in data.blocks
+        if isinstance(b, NifFormat.NiTriBasedGeom) and b.name.decode() == name
+    )
+    n = np.array([v.as_list() for v in g.data.normals], dtype=float)
+    if world:
+        n = n @ np.linalg.inv(matrix(g.get_transform(data.roots[0]))[:3, :3]).T
+    return n / np.maximum(np.linalg.norm(n, axis=1)[:, None], 1e-12)
+
+
+def warped_normals(p, n, transform):
+    # Preserve authored smoothing through the same local deformation as the
+    # positions. Each Jacobian row is d(output)/d(input axis).
+    epsilon = 1e-4
+    jacobian = np.stack(
+        [
+            (
+                transform(p + np.eye(3)[i] * epsilon)
+                - transform(p - np.eye(3)[i] * epsilon)
+            )
+            / (2 * epsilon)
+            for i in range(3)
+        ],
+        axis=1,
+    )
+    mapped = np.einsum("ni,nji->nj", n, np.linalg.inv(jacobian))
+    return mapped / np.maximum(np.linalg.norm(mapped, axis=1)[:, None], 1e-12)
 
 
 def normals(p, triangles):
@@ -86,13 +118,14 @@ def main():
         return d
 
     lock = nif(r"meshes\terminals\lockinterface01.nif")
-    pin = nif(r"meshes\terminals\bobbypin01.nif")
     box = nif(r"meshes\clutter\bobbypin\bobbypinbox.nif")
     can = nif(r"meshes\clutter\junk\tincan01.nif")
     parts = []
 
-    def add(name, p, uv, tri, material=0):
-        verts = np.column_stack([p, normals(p, tri), uv]).astype("<f4")
+    def add(name, p, uv, tri, material=0, normal=None):
+        verts = np.column_stack(
+            [p, normals(p, tri) if normal is None else normal, uv]
+        ).astype("<f4")
         assert np.isfinite(verts).all() and len(verts) < 10000 and len(tri) < 10000
         assert np.max(np.abs(p)) < 1 and tri.max() < len(verts)
         parts.append((name, material, verts, tri.astype("<u4")))
@@ -110,52 +143,90 @@ def main():
     )
     centre[[0, 2]] = matrix(g.get_transform(lock.roots[0]))[3, [0, 2]]
     p, uv, tri = mesh(lock, "frame:0", True)
-    xy = np.column_stack([p[:, 0] - centre[0], p[:, 2] - centre[2]])
-    # Preserve the original frame/plug ratio instead of widening the frame
-    # around a smaller plug. The front and tool contact plane stay unchanged.
-    xy *= 0.075 / 7.25
-    radius = np.linalg.norm(xy, axis=1)
-    front = np.interp(radius, [0.05084, 0.075], [0.024, 0.014])
-    add("frame", np.column_stack([xy, front - (p[:, 1] - centre[1]) * 0.010]), uv, tri)
-    p = np.column_stack(
-        [
-            lp[:, 0] * 0.075 / 7.25,
-            lp[:, 2] * 0.075 / 7.25,
-            0.024 - (lp[:, 1] - lp[:, 1].min()) * 0.036 / np.ptp(lp[:, 1]),
-        ]
+
+    def frame_transform(p):
+        xy = np.column_stack([p[:, 0] - centre[0], p[:, 2] - centre[2]]) * (
+            0.075 / 7.25
+        )
+        radius = np.linalg.norm(xy, axis=1)
+        front = np.interp(radius, [0.05084, 0.075], [0.024, 0.014])
+        return np.column_stack([xy, front - (p[:, 1] - centre[1]) * 0.010])
+
+    add(
+        "frame",
+        frame_transform(p),
+        uv,
+        tri,
+        normal=warped_normals(
+            p, source_normals(lock, "frame:0", True), frame_transform
+        ),
     )
-    add("cylinder", p, luv, lt)
+    plug_min, plug_back = lp[:, 1].min(), lp[:, 1].max()
+    # The last front-face ring surrounds the narrow slot. Compress only the
+    # broad dished face; keep the slot walls/back deep and the aperture intact.
+    plug_lip = lp[lp[:, 1] < 0, 1].max()
+    d = dimensions()
+    recess = d["plugFaceRecessDepth"]
+
+    def plug_transform(p):
+        return np.column_stack(
+            [
+                p[:, 0] * 0.075 / 7.25,
+                p[:, 2] * 0.075 / 7.25,
+                0.024
+                - np.minimum((p[:, 1] - plug_min) / (plug_lip - plug_min), 1) * recess
+                - np.maximum((p[:, 1] - plug_lip) / (plug_back - plug_lip), 0)
+                * (d["plugKeywayDepth"] - recess),
+            ]
+        )
+
+    add(
+        "cylinder",
+        plug_transform(lp),
+        luv,
+        lt,
+        normal=warped_normals(lp, source_normals(lock, "lock:0"), plug_transform),
+    )
     p, uv, tri = mesh(lock, "screwdriver:0")
-    z = np.interp(
-        p[:, 2],
-        [7.948953, 10.590867, 13.630203, 25.500305, 49.465488],
-        [0, 0.028, 0.042, 0.112, 0.182],
+    d = dimensions()
+
+    def driver_transform(p):
+        z = np.interp(
+            p[:, 2],
+            [7.948953, 10.590867, 13.630203, 25.500305, 49.465488],
+            [
+                0,
+                d["driverBladeEnd"],
+                d["driverShaftStart"],
+                d["driverHandleStart"],
+                d["driverLength"],
+            ],
+        )
+        scale = np.where(p[:, 2] < 12, 0.0024, np.where(p[:, 2] < 25.5, 0.0098, 0.0052))
+        x = (p[:, 0] + 17.230434) * scale
+        # Keep the TTWProp5 reference dimensions. The renderer fits these
+        # vertices to the working blade once, when it loads the mesh.
+        source_half = np.interp(p[:, 2], [7.948953, 10.590867, 13.630203], [.643554, .82373, .171116])
+        desired_half = np.interp(p[:, 2], [7.948953, 10.590867, 13.630203],
+                                 [d["propBladeTipHalfWidth"], d["propBladeHalfWidth"], d["propBladeNeckHalfWidth"]])
+        blade = p[:, 2] <= 13.6303
+        x[blade] = (p[blade, 0] + 17.233256) * desired_half[blade] / source_half[blade]
+        return np.column_stack([x, (p[:, 1] - 2.847224) * scale, z])
+
+    add(
+        "screwdriver",
+        driver_transform(p),
+        uv,
+        tri,
+        normal=warped_normals(
+            p, source_normals(lock, "screwdriver:0"), driver_transform
+        ),
     )
-    scale = np.where(p[:, 2] < 12, 0.0024, np.where(p[:, 2] < 25.5, 0.0098, 0.0052))
-    p = np.column_stack(
-        [(p[:, 0] + 17.230434) * scale, (p[:, 1] - 2.847224) * scale, z]
-    )
-    add("screwdriver", p, uv, tri)
-    p, uv, tri = mesh(pin, "bobbypin:0")
-    lo, hi = p.min(0), p.max(0)
-    p = np.column_stack(
-        [
-            (p[:, 2] - (lo[2] + hi[2]) / 2) * 0.003,
-            (p[:, 0] - (lo[0] + hi[0]) / 2) * 0.005,
-            (hi[1] - p[:, 1]) * 0.075 / (hi[1] - lo[1]),
-        ]
-    )
-    add("pin_shaft", p, uv, tri)
-    p, uv, tri = mesh(pin, "Pin2:0")
-    lo, hi = p.min(0), p.max(0)
-    p = np.column_stack(
-        [
-            (p[:, 1] - (lo[1] + hi[1]) / 2) * (0.081 / (hi[0] - lo[0])),
-            0.004 + (p[:, 0] - lo[0]) * 0.081 / (hi[0] - lo[0]),
-            (p[:, 2] - (lo[2] + hi[2]) / 2) * 0.0048,
-        ]
-    )
-    add("pin_handle", p, uv, tri)
+    # Both wire sections use the continuous metal island, never UV chords
+    # across the atlas's disconnected pin and screwdriver islands.
+    for output, held in [("pin_shaft", False), ("pin_handle", True)]:
+        p, uv, tri, n = wire_mesh(held)
+        add(output, p, uv, tri, normal=n)
     # Open the original carton lid; retain its exterior UVs and add an interior
     # matching the existing box collision bounds. The label uses the original
     # Bobby Pins artwork, with no inventory-count text.
@@ -261,7 +332,7 @@ def main():
     add("driver_can", p, uv, tri, 2)
     a.output.mkdir(parents=True, exist_ok=True)
     with (a.output / "props.bin").open("wb") as f:
-        f.write(b"TTWProp2")
+        f.write(b"TTWProp5")
         f.write(struct.pack("<I", len(parts)))
         for name, material, v, t in parts:
             f.write(struct.pack("<III", len(v), len(t), material))
@@ -282,11 +353,30 @@ def main():
                 )
             image = Image.open(io.BytesIO(raw)).convert("RGBA")
             assert max(image.size) <= 4096
+            if n == 0:
+                # Isolate the verified pin-metal strip before generating mips:
+                # distant wires must not bleed red handle pixels from the atlas.
+                d = dimensions()
+                w, h = image.size
+                patch = image.crop(
+                    (
+                        round(d["pinUvU0"] * w),
+                        round(d["pinUvV0"] * h),
+                        round(d["pinUvU1"] * w),
+                        round(d["pinUvV1"] * h),
+                    )
+                )
+                (
+                    a.output / ("pin-metal-n.rgba" if normal else "pin-metal.rgba")
+                ).write_bytes(struct.pack("<II", *patch.size) + patch.tobytes())
             (a.output / ("props-%d%s.rgba" % (n, "-n" if normal else ""))).write_bytes(
                 struct.pack("<II", *image.size) + image.tobytes()
             )
     manifest = dict(
-        format="TTWProp2",
+        format="TTWProp5",
+        geometry_baseline="pre-texture demo 3904966",
+        pin_geometry="round swept wire; isolated original pin-metal texture; no atlas bleed",
+        interaction_dimensions_metres=dimensions(),
         parts=[
             dict(
                 name=n,

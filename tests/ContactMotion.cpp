@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Physical.h"
+#include "ArmContact.h"
 #include <cassert>
 #include <cstdio>
 using namespace locks;
@@ -10,6 +11,41 @@ float qdistance(Quat a, Quat b) {
   return 1 - std::abs(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w);
 }
 int main() {
+  // The sleeve follows the weapon rig in either hand even across 180 degrees.
+  for (float angle : {0.f,.6f,2.6f,3.14f,3.16f,4.f,-3.16f}) {
+    const Vec axis = normal({.3f,-.8f,.5f});
+    Mat fore = matrix(axisAngle(normal({-.5f,.7f,.1f}),1.3f));
+    Mat wrist = mul(fore,matrix(axisAngle(axis,angle)));
+    Mat wanted = mul(fore,matrix(axisAngle(axis,angle*.5f)));
+    Mat animated = mul(wanted,matrix(axisAngle({0,1,0},.16f)));
+    Mat sleeve = weaponSleeve(fore,wrist,animated);
+    for (int j=0;j<9;++j) assert(std::abs(wanted.v[j]-sleeve.v[j])<.0002f);
+    Vec reach=fore.apply({18.f,1.f,-.4f});
+    Mat cuff=fitSleeveToWrist(sleeve,reach);
+    assert(length(cuff.apply({1,0,0})-normal(reach))<.001f);
+    Mat rolled=mul(sleeve,matrix(axisAngle({1,0,0},.65f)));
+    Mat twisted=fitSleeveToWrist(rolled,reach);
+    Mat expected=mul(matrix(axisAngle(normal(reach),.65f)),cuff);
+    for (int j=0;j<9;++j) assert(std::abs(expected.v[j]-twisted.v[j])<.001f);
+  }
+  for (float side : {-1.f,1.f}) {
+    Transform parent{matrix(axisAngle({0,1,0},.71f)),{23,41,8},1.2f};
+    Transform upper{{},{side*5,2,1},1}, fore{matrix(axisAngle({0,0,1},side*.65f)),{side*22,0,0},1};
+    Transform hand{{},{side*18,0,0},1};
+    auto original=childWorld(childWorld(childWorld(parent,upper),fore),hand);
+    for (Vec offset : {Vec{-.3f,2,3},Vec{0,9,1},Vec{side*95,0,0}}) {
+      auto u=upper,f=fore,h=hand,goal=original;
+      goal.rotation=mul(matrix(axisAngle({0,1,0},.22f)),goal.rotation);
+      goal.position=goal.position+offset;
+      Transform shown;
+      assert(contactArm(parent,u,f,h,goal,shown));
+      assert(length(f.position-fore.position)==0 && length(h.position-hand.position)==0);
+      auto shoulder=childWorld(parent,u);
+      float attainable=std::clamp(length(goal.position-shoulder.position),4*parent.scale,40*parent.scale);
+      assert(length(shown.position-(shoulder.position+normal(goal.position-shoulder.position)*attainable))<.001f);
+      assert(length(shown.rotation.apply({0,0,1})-goal.rotation.apply({0,0,1}))<.0001f);
+    }
+  }
   // Neither approaching orientation nor lateral position is canonicalized.
   for (int h=0;h<2;h++)
     for (float opening : {65.f/90, 1.f, 1.5f})
@@ -42,10 +78,17 @@ int main() {
         hand[h].p=hand[h].p+pin.entryAxis*.10f;step(1);
         assert(!pin.inserted && t.pickHand==h);
       }
-  // The restored original keyhole is wider/taller, with the same wire
-  // clearance margin. Contacts just inside work; just outside cannot latch.
-  for (Vec tip : {Vec{.005f, .024f, .026f}, Vec{-.005f, -.024f, .026f},
-                  Vec{.008f, 0, .026f}, Vec{0, .031f, .026f}}) {
+  // Demo-sized aperture: inside wire clearance engages; an adjacent miss
+  // cannot latch. Verify both sides of each actual boundary.
+  struct EntryCase { Vec tip; bool inside; };
+  for (const auto &test : {
+         EntryCase{{.003f, .015f, .026f}, true},
+         EntryCase{{-.003f, -.015f, .026f}, true},
+         EntryCase{{.0036f, 0, .026f}, false},
+         EntryCase{{-.0036f, 0, .026f}, false},
+         EntryCase{{0, .0166f, .026f}, false},
+         EntryCase{{0, -.0166f, .026f}, false}}) {
+    Vec tip = test.tip;
     PhysicalInteraction t;
     t.config.useHolders = false; t.config.requirePreparation = false;
     Pose other{{}, {2, 2, 2}}, hand;
@@ -53,8 +96,7 @@ int main() {
     hand = gripAt(t.tools[0].pose, 1); t.update({}, hand, other, 1, 0, 0);
     hand = gripAt({{}, tip + Vec{0, 0, .06f}}, 1); t.update({}, hand, other, 1, 0, 0);
     hand = gripAt({{}, tip}, 1); t.update({}, hand, other, 1, 0, 0);
-    bool inside = std::abs(tip.x) < keywayHalfWidth - pinEntryMargin &&
-                  std::abs(tip.y) < keywayHalfHeight - pinEntryMargin;
+    bool inside = test.inside;
     assert(t.tools[0].inserted == inside);
     if (inside) assert(length(t.tools[0].pose.p - tip) < .0002f);
   }

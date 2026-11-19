@@ -34,7 +34,7 @@ inline bool readProps(FILE *file, Props &out) {
   static_assert(sizeof(PropVertex) == 32);
   char magic[8];
   uint32_t count;
-  if (fread(magic, 1, 8, file) != 8 || memcmp(magic, "TTWProp2", 8) ||
+  if (fread(magic, 1, 8, file) != 8 || memcmp(magic, "TTWProp5", 8) ||
       fread(&count, 4, 1, file) != 1 || count != PropCount)
     return false;
   Props loaded;

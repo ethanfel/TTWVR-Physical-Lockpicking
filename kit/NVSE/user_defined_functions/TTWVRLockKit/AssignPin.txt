@@ -1,0 +1,21 @@
+int slot
+ref token
+begin Function {slot}
+ SetFunctionValue 0
+ if slot < 1 || slot > 8 || player.GetItemCount 0000000A < 1
+  return
+ endif
+ let token := GetFormFromMod "TTWVRLockKit.esp" "000800"
+ if eval !token
+  return
+ endif
+ if (player.GetItemCount token) == 0
+  player.AddItem token 1 1
+ endif
+ if (player.GetItemCount token) > 0
+  SetHotkey slot token
+  if eval (GetHotkeyItem slot) == token
+   SetFunctionValue slot
+  endif
+ endif
+end

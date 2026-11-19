@@ -3,6 +3,12 @@
 #include "Math.h"
 namespace locks {
 enum class LockStyle : unsigned { Round = 0, Padlock = 1, RoundedSafe = 2 };
+// Prepared TTWProp2 assets retain their source dimensions. Resize only lock
+// hardware at draw time; tools, target objects and the contact plane stay put.
+constexpr float assetPlugRadius = .05084f;
+constexpr float lockPlugRadius = .032f, lockSizeRatio = lockPlugRadius / assetPlugRadius;
+constexpr float roundFrameRadius = .075f * lockSizeRatio;
+constexpr float roundShoulderRadius = .055f * lockSizeRatio;
 // Metres in the existing lock frame. The tool contact plane stays unchanged.
 constexpr float padHalfX = .038f, padHalfY = .032f, padCorner = .005f;
 constexpr float padBack = -.014f, padFront = .020f;
@@ -11,8 +17,10 @@ constexpr float shackleBottom = .023f, shackleRightBottom = .006f,
                 shackleRadius = .004f;
 constexpr float stapleY = shackleShoulder + shackleHalfWidth;
 constexpr float stapleRadius = .008f, stapleWire = .002f;
-constexpr float padPlugRadius = .025f, padPlugYScale = .48f;
-constexpr float safeHalf = .073f, safeCorner = .014f, safeBevel = .004f;
+// The standard working slot needs a surrounding face inside the unchanged body.
+constexpr float padPlugRadius = .024f;
+constexpr float safeHalf = .073f * lockSizeRatio, safeCorner = .014f * lockSizeRatio,
+                safeBevel = .004f * lockSizeRatio;
 constexpr float safeBack = -.012f, safeFront = .020f;
 inline float safeOutlineDistance(float x, float y, float inset = 0) {
   float a = std::abs(x) - (safeHalf - safeCorner),

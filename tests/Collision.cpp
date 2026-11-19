@@ -5,9 +5,9 @@
 #include <cstdio>
 using namespace locks;
 int main() {
-  assert(housingDistance({.06f, 0, 0}) < 0);
-  assert(housingDistance({.045f, 0, .022f}) < 0); // restored plug face
-  assert(housingDistance({.054f, 0, .022f}) > 0); // outside its edge
+  assert(housingDistance({.06f * lockSizeRatio, 0, 0}) < 0);
+  assert(housingDistance({.045f * lockSizeRatio, 0, .022f}) < 0); // restored plug face
+  assert(housingDistance({.054f * lockSizeRatio, 0, .022f}) > 0); // outside its edge
   assert(housingDistance({0, 0, 0}) > 0);      // actual opening
   assert(housingDistance({0, 0, -.060f}) > 0); // no invisible backplate
   assert(housingDistance({.10f, .10f, 0}) > 0);
@@ -17,11 +17,11 @@ int main() {
     // Approach the front, sides, top and back at speeds high enough to cross
     // the whole object in a single frame. No endpoint-only collision test.
     for (auto pair :
-         {std::array<Vec, 2>{{{.06f, 0, .3f}, {.06f, 0, -.3f}}},
+         {std::array<Vec, 2>{{{.06f * lockSizeRatio, 0, .3f}, {.06f * lockSizeRatio, 0, -.3f}}},
           std::array<Vec, 2>{{{.4f, 0, 0.f}, {-.4f, 0, 0.f}}},
           std::array<Vec, 2>{{{-.4f, 0, 0.f}, {.4f, 0, 0.f}}},
-          std::array<Vec, 2>{{{.06f, .4f, 0.f}, {.06f, -.4f, 0.f}}},
-          std::array<Vec, 2>{{{.06f, 0, -.4f}, {.06f, 0, .3f}}}}) {
+          std::array<Vec, 2>{{{.06f * lockSizeRatio, .4f, 0.f}, {.06f * lockSizeRatio, -.4f, 0.f}}},
+          std::array<Vec, 2>{{{.06f * lockSizeRatio, 0, -.4f}, {.06f * lockSizeRatio, 0, .3f}}}}) {
       auto c = moveAgainstHousing(shape, {{}, pair[0]}, {{}, pair[1]});
       assert(c.hit);
       assert(shape.clearance(c.pose, 0) >= -.00015f);
@@ -29,12 +29,12 @@ int main() {
     }
     // Sliding along the front and pulling away both remain possible.
     auto hit =
-        moveAgainstHousing(shape, {{}, {.06f, 0, .15f}}, {{}, {.06f, 0, -.1f}});
+        moveAgainstHousing(shape, {{}, {.06f * lockSizeRatio, 0, .15f}}, {{}, {.06f * lockSizeRatio, 0, -.1f}});
     Pose across = hit.pose;
-    across.p.x += .025f;
+    across.p.y -= .020f;
     across.p.z -= .05f;
     auto slide = moveAgainstHousing(shape, hit.pose, across);
-    assert(slide.hit && slide.pose.p.x > hit.pose.p.x + .020f);
+    assert(slide.hit && slide.pose.p.y < hit.pose.p.y - .015f);
     Pose back = slide.pose;
     back.p.z += .10f;
     auto away = moveAgainstHousing(shape, slide.pose, back);
@@ -44,6 +44,12 @@ int main() {
         moveAgainstHousing(shape, {{}, {.4f, 0, .2f}}, {{}, {.4f, -.4f, -.3f}});
     assert(!clear.hit);
   }
+  // A target protruding beyond the lock face must still stop an incoming blade.
+  TargetBounds extended{{-.12f, -.12f, -.03f}, {.12f, .12f, .30f}, true, LockStyle::RoundedSafe};
+  ToolShape driver(1, 1, 0, extended);
+  Pose start{{}, {.07f, 0, .55f}}, end{{}, {.07f, 0, .26f}};
+  auto surface = moveAgainstHousing(driver, start, end);
+  assert(surface.hit && surface.pose.p.z >= .299f);
   // Every bend the free preparation gesture can produce fits the bounded
   // collision sample storage, including different bend planes.
   for (float opening = 0; opening <= 1.801f; opening += .03f)
@@ -59,7 +65,7 @@ int main() {
     }
   // Mid-shaft contact, including a rotating sideways pin, not only tip/ends.
   ToolShape pin(0);
-  Pose a{axisAngle({0, 1, 0}, pi / 2), {-.04f, .06f, .15f}}, b = a;
+  Pose a{axisAngle({0, 1, 0}, pi / 2), {-.04f, .06f * lockSizeRatio, .15f}}, b = a;
   b.p.z = -.10f;
   auto hit = moveAgainstHousing(pin, a, b);
   assert(hit.hit && pin.clearance(hit.pose, 0) >= -.00015f);
@@ -73,7 +79,7 @@ int main() {
     PhysicalInteraction t;
     t.update({}, {}, {}, 0, 0, 0);
     t.tools[1].holstered = false;
-    t.tools[1].pose = {axisAngle({1, 0, 0}, pi / 2), {.06f, .4f, 0.f}};
+    t.tools[1].pose = {axisAngle({1, 0, 0}, pi / 2), {.06f * lockSizeRatio, .4f, 0.f}};
     bool contact = false;
     for (int n = 0; n < int(2 / dt); n++) {
       t.update({}, {}, {}, 0, 0, 0, dt);

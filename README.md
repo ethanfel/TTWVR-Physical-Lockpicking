@@ -1,22 +1,22 @@
 # TTWVR Physical Lockpicking
 
-Pick locks with your hands in VR: bend a bobby pin, insert it, and turn the screwdriver. Feel resistance through controller vibration.
+Pick a door, safe or ammo box with both hands in VR. Draw the bobby pin and screwdriver from one holster, bend the pin, then feel the lock resist as you push the screwdriver sideways.
 
-![Physical lockpicking](docs/stereo-v23-safe.png)
+**[Download Beta 0.1](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.1/TTWVR-Physical-Lockpicking-Beta-0.1.zip)**
 
-- Either hand can use either tool.
-- Pins bend, fall, and can be picked back up.
-- Uses Fallout's lock difficulty, skill and pin inventory.
-- Includes gameplay and VR minigame capture tools.
+| Install on | Follow this guide |
+| --- | --- |
+| Windows with Mod Organizer 2 | [Windows installation](docs/install-windows.md) |
+| Linux with Proton and Fluorine | [Linux installation](docs/install-linux.md) |
 
-**Experimental.** Tested with TTWVR 1.1.6 and Fallout New Vegas 1.4.0.525 on Linux/Proton. Use a separate profile with copied saves. Native Windows testing is still pending.
+Start with **Tale of Two Wastelands already running in VR** on **Tale of Two Realities 1.1.6 or 1.1.7**. The ZIP contains the compiled addon. A one-time Python setup prepares the meshes and textures from your own game files. Native Windows headset play is unverified.
 
-[Build instructions](docs/REFERENCE.md#build-on-linux) · [Controls](docs/REFERENCE.md#controls) · [Recording](docs/REFERENCE.md#video-recording) · [Test galleries](tools/test_stage/README.md)
+## Your first lock
 
-## Additional information
+1. In the **large floating Pip-Boy**, highlight **Items → Misc → Bobby Pin**. Hold **Hotkey**, choose a wheel direction, then release it. Place that holster within reach of both hands.
+2. Draw with either hand to take a pin. Bend it with both hands, then draw the screwdriver from the same holster with your free hand.
+3. Seat the pin in the keyhole. Press the screwdriver blade into the lower slot and push the handle sideways. If you feel resistance, ease off and adjust the pin. A replacement pin keeps the same sweet spot on that lock.
 
-[How the dark void and blurred game background work](docs/WORKSPACE-BACKGROUND.md).
+A picked door stays closed until you open it. Containers open on success. For the close-up interaction with the pin box and screwdriver tin, stow both tools and activate the lock.
 
-[Technical reference](docs/REFERENCE.md) · [Validation](docs/VALIDATION.md)
-
-**License:** [GPL-3.0-only](LICENSE). Game and mod assets are separate dependencies.
+[Help and removal](docs/help.md) · [Manual setup and building from source](docs/advanced.md) · [GPL-3.0-only](LICENSE)

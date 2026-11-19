@@ -15,29 +15,53 @@ template <class T> void release(T *&p) {
   }
 }
 struct Mesh {
-  struct V {
-    Vec p, c, uv, n;
-  };
+  using V = SceneVertex;
   std::vector<V> v;
+  std::vector<SceneDraw> draws;
+  unsigned object = 0;
+  std::map<unsigned, CachedNativePart> *nativeParts = nullptr;
+  void localDraw(const LocalVertices &vertices, Pose pose) {
+    draws.push_back({object++, v.size(), vertices->size(), pose, vertices});
+  }
+  void finish(size_t first, Pose pose = {}) {
+    draws.push_back({object++, first, v.size()-first, pose});
+  }
   void tri(Vec a, Vec b, Vec c, Vec color) {
     Vec n = normal(cross(b - a, c - a));
     float light = .50f + .5f * std::abs(dot(n, normal({-.3f, .6f, 1})));
     color = color * light;
-    v.push_back({a, color});
-    v.push_back({b, color});
-    v.push_back({c, color});
+    v.push_back({a, color, {}, n});
+    v.push_back({b, color, {}, n});
+    v.push_back({c, color, {}, n});
   }
   void prop(const PropMesh &asset, Pose pose = {}, float surface = 0,
-            bool compactPlug = false) {
+            LockMeshSize size = LockMeshSize::Unchanged) {
+    if (nativeParts) {
+      auto &part = (*nativeParts)[object];
+      if (!part.vertices || part.asset != &asset || part.size != size || part.surface != surface) {
+        auto vertices = std::make_shared<std::vector<V>>();
+        vertices->reserve(asset.triangles.size() * 3);
+        for (const auto &tri : asset.triangles)
+          for (auto index : tri) {
+            auto x = fitLockVertex(asset.vertices[index], size);
+            vertices->push_back({x.p, {1, 1, 1},
+                                 {x.u, x.v, surface ? surface : float(asset.material + 2)}, x.n});
+          }
+        part = {&asset, size, surface, 0, 0, vertices};
+      }
+      localDraw(part.vertices, pose);
+      return;
+    }
+    size_t first = v.size();
     for (auto tri : asset.triangles)
       for (auto index : tri) {
-        const auto x = compactPlug ? padlockPlugVertex(asset.vertices[index])
-                                   : asset.vertices[index];
+        const auto x = fitLockVertex(asset.vertices[index], size);
         v.push_back({world(pose, x.p),
                      {1, 1, 1},
                      {x.u, x.v, surface ? surface : float(asset.material + 2)},
                      rotate(pose.q, x.n)});
       }
+    finish(first, pose);
   }
   void texturedPin(const Props &props, float opening, float twist, Pose pose) {
     Vec hinge = pinHinge(opening, twist);
@@ -47,11 +71,31 @@ struct Mesh {
          compose(pose,
                  {{}, hinge + Vec{.006f * std::max(0.f, 1 - opening), 0, 0}}),
          5);
+    if (nativeParts) {
+      auto &part = (*nativeParts)[object];
+      if (!part.vertices || part.opening != opening || part.twist != twist) {
+        Mesh bend;
+        bend.pinBend(opening, twist, {});
+        part = {nullptr, LockMeshSize::Unchanged, 0, opening, twist,
+                std::make_shared<std::vector<V>>(std::move(bend.v))};
+      }
+      localDraw(part.vertices, pose);
+      return;
+    }
+    size_t bendBegin = v.size();
+    pinBend(opening, twist, pose);
+    finish(bendBegin, pose);
+  }
+  void pinBend(float opening, float twist, Pose pose) {
     Vec previous = pinBendPoint(opening, 0, twist);
     for (int i = 1; i <= 8; i++) {
       Vec next = pinBendPoint(opening, i / 8.f, twist);
-      rod(world(pose, previous), world(pose, next), .0014f, {.38f, .34f, .24f},
-          6);
+      size_t first = v.size();
+      rod(world(pose, previous), world(pose, next), pinWireRadius, {1, 1, 1}, 6);
+      for (size_t n = first; n < v.size(); ++n) {
+        v[n].c = {1, 1, 1};
+        v[n].uv = {(i - .5f) / 8, .5f, 5};
+      }
       previous = next;
     }
   }
@@ -83,21 +127,26 @@ struct Mesh {
   }
 };
 Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
-          const TargetAsset *target) {
+          const TargetAsset *target, const PropMesh *plugSkirts,
+          std::map<unsigned, CachedNativePart> *nativeParts) {
   Mesh m;
+  m.nativeParts = nativeParts;
   Vec brass{.48f, .27f, .075f}, steel{.44f, .5f, .52f};
-  Pose opening = target ? target->Motion(s.targetOpenTime) : Pose{};
+  float openTime = targetPresentationTime(s.config.nativeScene, s.targetOpenTime);
+  Pose opening = target ? target->Motion(openTime) : Pose{};
+  m.object = 1000;
   if (target)
     for (const auto &part : target->parts)
       m.prop(part.mesh, part.moving ? opening : Pose{},
              float((part.alpha ? 20 : 10) + part.mesh.material));
   bool padlock = target && target->bounds.style == LockStyle::Padlock;
   bool safe = target && target->bounds.style == LockStyle::RoundedSafe;
-  size_t lockBegin = m.v.size();
+  size_t lockBegin = m.v.size(), lockDrawBegin = m.draws.size();
   if (padlock) {
     static const PadlockMesh pad;
+    m.object = 4;
     m.prop(pad.body, {}, 30);
-    m.prop(pad.shackle, padlockShackleMotion(s.targetOpenTime), 30);
+    m.prop(pad.shackle, padlockShackleMotion(openTime), 30);
     m.prop(pad.staple, opening, 30);
     if (!props)
       for (size_t n = lockBegin; n < m.v.size(); n++) {
@@ -109,6 +158,7 @@ Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
   }
   if (safe) {
     static const SafeFrameMesh frame;
+    m.object = 7;
     m.prop(frame.body, {}, 31);
     if (!props)
       for (size_t n = lockBegin; n < m.v.size(); n++) {
@@ -119,38 +169,46 @@ Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
       }
   }
   if (props) {
+    m.object = 1;
     if (!padlock && !safe)
-      m.prop((*props)[Frame]);
+      m.prop((*props)[Frame], {}, 0, LockMeshSize::Round);
+    m.object = 2;
     m.prop((*props)[Cylinder], turnWithCylinder({}, s.cylinder), padlock ? 8 : safe ? 9 : 6,
-           padlock);
+           padlock ? LockMeshSize::Padlock : LockMeshSize::RoundPlug);
+    m.prop(plugSkirts[padlock ? 1 : 0],turnWithCylinder({},s.cylinder),padlock ? 8 : safe ? 9 : 6);
   } else {
     if (!padlock && !safe) {
-      m.rod({0, 0, -.012f}, {0, 0, .014f}, .075f, brass, 48);
-      m.rod({0, 0, .014f}, {0, 0, .02f}, .055f, {.25f, .28f, .27f}, 48);
+      m.rod({0, 0, -.012f}, {0, 0, .014f}, roundFrameRadius, brass, 48);
+      m.rod({0, 0, .014f}, {0, 0, .02f}, roundShoulderRadius, {.25f, .28f, .27f}, 48);
     }
     // Cylinder face, key slot and tool all rotate independently of the housing.
     float c = -s.cylinder * pi / 180;
     Vec side{std::cos(c), std::sin(c), 0}, up{-std::sin(c), std::cos(c), 0};
     m.rod({0, 0, .02f}, {0, 0, .024f}, plugRadius(padlock ? LockStyle::Padlock : LockStyle::Round),
           safe ? Vec{.12f, .13f, .14f} : Vec{.6f, .37f, .12f}, 40);
-    float height = keywayHeight(padlock ? LockStyle::Padlock : LockStyle::Round);
+    auto style = padlock ? LockStyle::Padlock : LockStyle::Round;
+    float width = keywayWidth(style), height = keywayHeight(style);
     Vec center{0, 0, .025f};
-    Vec a = center + side * keywayHalfWidth + up * height,
-        b = center - side * keywayHalfWidth + up * height,
-        d = center - side * keywayHalfWidth - up * height,
-        e = center + side * keywayHalfWidth - up * height;
+    Vec a = center + side * width + up * height,
+        b = center - side * width + up * height,
+        d = center - side * width - up * height,
+        e = center + side * width - up * height;
     m.tri(a, b, d, {.005f, .008f, .006f});
     m.tri(a, d, e, {.005f, .008f, .006f});
   }
-  if (target && !padlock && s.targetOpenTime > 0)
+  if (target && !padlock && openTime > 0) {
     for (size_t n = lockBegin; n < m.v.size(); n++) {
       m.v[n].p = world(opening, m.v[n].p);
       m.v[n].n = rotate(opening.q, m.v[n].n);
     }
+    for(size_t n=lockDrawBegin;n<m.draws.size();n++)
+      m.draws[n].pose = compose(opening,m.draws[n].pose);
+  }
   size_t begin;
   if (s.config.useHolders)
     for (int k = 0; k < 2; k++) {
       if (props) {
+        m.object = 10 + k;
         m.prop((*props)[k == 0 ? PinBoxProp : DriverCan],
                {{}, holderPoint(s.config, k)});
         continue;
@@ -174,21 +232,22 @@ Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
     for (int slot = 0; slot < s.storedPinCount; slot++) {
       const auto &stored = s.storedPins[slot];
       if (props) {
+        m.object = 100 + slot * 3;
         m.texturedPin(*props, stored.opening, stored.twist, stored.pose);
         continue;
       }
       size_t start = m.v.size();
       Vec wire{.64f, .53f, .30f},
           previous = pinBendPoint(stored.opening, 0, stored.twist);
-      m.rod({}, previous, .0014f, wire, 6);
+      m.rod({}, previous, pinWireRadius, wire, 6);
       for (int n = 1; n <= 4; n++) {
         Vec next = pinBendPoint(stored.opening, n / 4.f, stored.twist);
-        m.rod(previous, next, .0014f, wire, 6);
+        m.rod(previous, next, pinWireRadius, wire, 6);
         previous = next;
       }
       for (int n = 1; n <= 6; n++) {
         Vec next = pinHandlePoint(stored.opening, n / 6.f, stored.twist);
-        m.rod(previous, next, .0014f, wire, 6);
+        m.rod(previous, next, pinWireRadius, wire, 6);
         previous = next;
       }
       m.rod(previous, previous + Vec{0, .002f, 0}, .0021f, wire, 6);
@@ -202,6 +261,7 @@ Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
     if (!tool.visible || (k == 0 && tool.holstered && s.config.useHolders))
       continue;
     if (props) {
+      m.object = k == 0 ? 200 : 203;
       if (k == 0)
         m.texturedPin(*props, tool.opening, tool.bendYaw, tool.pose);
       else
@@ -218,28 +278,37 @@ Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
     if (k == 0) {
       Vec wire{.64f, .53f, .30f};
       Vec previous = pinBendPoint(tool.opening, 0, tool.bendYaw);
-      m.rod({}, previous, .0014f, wire, 10);
+      m.rod({}, previous, pinWireRadius, wire, 10);
       for (int n = 1; n <= 12; n++) {
         Vec next = pinBendPoint(tool.opening, n / 12.f, tool.bendYaw);
-        m.rod(previous, next, .0014f, wire, 10);
+        m.rod(previous, next, pinWireRadius, wire, 10);
         previous = next;
       }
       for (int n = 1; n <= 40; n++) {
         Vec next = pinHandlePoint(tool.opening, n / 40.f, tool.bendYaw);
-        m.rod(previous, next, .0014f, n > 23 ? color : wire, 10);
+        m.rod(previous, next, pinWireRadius, n > 23 ? color : wire, 10);
         previous = next;
       }
       m.rod(previous, previous + Vec{0, .002f, 0}, .0021f, wire, 10);
     } else {
-      // Narrow blade fits beside the pin at every cylinder angle.
-      m.box({-.002f, -.0006f, 0}, {.002f, .0006f, .028f}, steel);
-      m.rod({0, 0, .028f}, {0, 0, .042f}, .002f, steel, 12);
-      m.rod({0, 0, .042f}, handle.a, .004f, steel, 12);
-      m.rod(handle.a, handle.b, .012f, color, 20);
+      size_t bladeBegin=m.v.size();
+      m.box({-driverBladeHalfWidth, -driverBladeHalfThickness, 0},
+            {driverBladeHalfWidth, driverBladeHalfThickness, driverBladeEnd}, steel);
+      for(size_t j=bladeBegin;j<m.v.size();j++) {
+        auto &v=m.v[j];
+        float width=driverBladeTipHalfWidth+(driverBladeHalfWidth-driverBladeTipHalfWidth)*v.p.z/driverBladeEnd;
+        v.p.x*=width/driverBladeHalfWidth;
+      }
+      m.rod({0, 0, driverBladeEnd}, {0, 0, driverShaftStart}, .002f, steel, 12);
+      m.rod({0, 0, driverShaftStart}, handle.a, driverShaftRadius, steel, 12);
+      for(size_t j=bladeBegin;j<m.v.size();j++) {
+        auto &v=m.v[j];v.n=driverMetalNormal(v.p,v.n);v.p=driverMetalPosition(v.p);
+      }
+      m.rod(handle.a, handle.b, driverHandleRadius, color, 20);
     }
     if (k == 1) {
       for (int n = 0; n < 6; n++) {
-        Vec radial = screwdriverRadial(n * 60.f) * .012f;
+        Vec radial = screwdriverRadial(n * 60.f) * driverHandleRadius;
         m.rod(handle.a + Vec{0, 0, .006f} + radial,
               handle.b - Vec{0, 0, .006f} + radial, .0018f,
               n == 0 ? Vec{.8f, .57f, .18f} : Vec{.045f, .09f, .05f}, 8);
@@ -251,6 +320,8 @@ Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
   if (s.tracked)
     for (int n = 0; n < 2; n++) {
       if (!hands[n].triangles.empty()) {
+        size_t first = m.v.size();
+        m.object = 210 + n;
         const auto &asset = hands[n];
         Pose hand = relative(s.lock, s.hands[n]);
         float curl = std::clamp(s.holds[n], 0.f, 1.f);
@@ -273,8 +344,10 @@ Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
             float light =
                 .55f + .45f * std::abs(dot(n, normal({-.3f, .6f, 1})));
             vertex.c = {light, light, light};
+            vertex.n = n;
           }
         }
+        m.finish(first,hand);
       } else {
         Vec hand = local(s.lock, s.hands[n].p);
         Vec color = n ? Vec{.12f, .3f, .45f} : Vec{.5f, .32f, .08f};
@@ -288,6 +361,7 @@ Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
 }
 } // namespace
 Renderer::~Renderer() {
+  for (auto &t : hardwareTextures) release(t);
   for (auto &set : targetTextures)
     for (auto &texture : set)
       release(texture);
@@ -457,10 +531,10 @@ bool Renderer::LoadProps() {
   if (f)
     fclose(f);
   if (ok)
-    for (int i = 0; i < 6; i++) {
-      auto name =
+    for (int i = 0; i < 8; i++) {
+      std::wstring name = i >= 6 ? (i == 6 ? L"pin-metal.rgba" : L"pin-metal-n.rgba") :
           L"props-" + std::to_wstring(i % 3) + (i < 3 ? L".rgba" : L"-n.rgba");
-      if (!LoadTexture(root + name, i < 3, &propTextures[i])) {
+      if (!LoadTexture(root + name, i < 3 || i == 6, &propTextures[i])) {
         ok = false;
         break;
       }
@@ -479,17 +553,32 @@ bool Renderer::LoadProps() {
         "fallback=procedural");
     return false;
   }
+  for(auto &v:loaded[Driver].vertices) {
+    fitPreparedDriverBlade(v.p, v.n);
+    v.n=driverMetalNormal(v.p,v.n);v.p=driverMetalPosition(v.p);
+  }
   props = std::move(loaded);
+  plugSkirts[0]=makePlugSkirt(props[Cylinder],false);
+  plugSkirts[1]=makePlugSkirt(props[Cylinder],true);
+  Log("plug_skirts round_triangles=%u padlock_triangles=%u",unsigned(plugSkirts[0].triangles.size()),unsigned(plugSkirts[1].triangles.size()));
   unsigned count = 0;
   for (const auto &m : props)
     count += unsigned(m.triangles.size());
-  Log("prop_mesh loaded=1 parts=%u triangles=%u textures=6 mipmaps=1",
+  Log("prop_mesh loaded=1 parts=%u triangles=%u textures=8 mipmaps=1",
       unsigned(props.size()), count);
   return true;
 }
-void Renderer::LoadTargets() {
+void Renderer::EnsureTarget(unsigned k) {
+  if (k == loadedTarget) return;
+  nativeParts.clear();
+  if (loadedTarget && loadedTarget <= targetKinds) {
+    targets[loadedTarget - 1] = {};
+    for (auto &t : targetTextures[loadedTarget - 1]) release(t);
+  }
+  loadedTarget = k;
+  if (!k || k > targetKinds) return;
   auto root = folder + L"\\TTWVRPhysicalLockpicking\\";
-  for (unsigned k = 1; k <= targetKinds; k++) {
+  {
     auto prefix = L"target-" + std::to_wstring(k);
     auto *f = _wfopen((root + prefix + L".bin").c_str(), L"rb");
     TargetAsset asset;
@@ -531,10 +620,25 @@ bool Renderer::Init(ID3D11Device *d) {
     return false;
   if (!background.Init(device))
     Log("background_init failed=1 fallback=dark");
-  video.Init(device, immediate, size);
+  video.Init(device, immediate, captureSize);
   LoadHands(); // Optional local game assets; markers remain the safe fallback.
   propsReady = LoadProps();
-  LoadTargets();
+  // Only the selected target is loaded; expanding coverage must not upload
+  // the entire catalogue's textures into a 32-bit game process.
+  for (unsigned i=0;i<4;i++) {
+    auto path = folder + L"\\TTWVRPhysicalLockpicking\\target-" +
+      std::to_wstring(i<2?2:1) + L"-0" + (i%2?L"-n.rgba":L".rgba");
+    LoadTexture(path, i%2==0, &hardwareTextures[i]);
+  }
+  ID3D11CommandList *hardwareCommands=nullptr;
+  if (SUCCEEDED(deferred->FinishCommandList(FALSE,&hardwareCommands))) {
+    immediate->ExecuteCommandList(hardwareCommands,TRUE);release(hardwareCommands);
+  }
+  Log("lock_dimensions round_diameter=%.4f safe_width=%.4f plug_diameter=%.4f "
+      "pad_plug_diameter=%.4f slot_width=%.4f round_slot_height=%.4f pad_slot_height=%.4f",
+      2 * roundFrameRadius, 2 * safeHalf, 2 * lockPlugRadius, 2 * padPlugRadius,
+      2 * keywayWidth(LockStyle::Round), 2 * keywayHeight(LockStyle::Round),
+      2 * keywayHeight(LockStyle::Padlock));
   D3D11_BLEND_DESC blendDesc{};
   auto &b = blendDesc.RenderTarget[0];
   b.BlendEnable = TRUE;
@@ -550,7 +654,7 @@ bool Renderer::Init(ID3D11Device *d) {
   D3D11_SAMPLER_DESC sd{};
   sd.Filter = D3D11_FILTER_ANISOTROPIC;
   sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-  sd.MaxAnisotropy = 8;
+  sd.MaxAnisotropy = 16;
   sd.MaxLOD = D3D11_FLOAT32_MAX;
   if (FAILED(d->CreateSamplerState(&sd, &sampler)))
     return false;
@@ -559,6 +663,8 @@ Texture2D handTex:register(t0);
 Texture2D lockTex:register(t1); Texture2D boxTex:register(t2); Texture2D canTex:register(t3);
 Texture2D lockNormal:register(t4); Texture2D boxNormal:register(t5); Texture2D canNormal:register(t6);
 Texture2D targetTex[8]:register(t7); Texture2D targetNormal[8]:register(t15);
+Texture2D pinTex:register(t23); Texture2D pinNormal:register(t24);
+Texture2D hardwareTex[4]:register(t25);
 SamplerState texSampler:register(s0);
 struct V { float4 p:POSITION; float4 c:COLOR; float3 uv:TEXCOORD0;
            float3 n:NORMAL; float3 w:TEXCOORD1; float3 view:TEXCOORD2; };
@@ -569,10 +675,12 @@ float4 ps(O o):SV_Target {
   float3 c=o.c.rgb;float alpha=1;
   if(o.uv.z>1.5) {
     float4 tex=float4(1,1,1,1), bump=float4(.5,.5,1,1);
-    if(o.uv.z>=9.5) {
+    if(o.uv.z>4.5 && o.uv.z<5.5) { tex=pinTex.Sample(texSampler,o.uv.xy); bump=pinNormal.Sample(texSampler,o.uv.xy); }
+    else if(o.uv.z>=9.5) {
       bool targetMetal=o.uv.z>29.5;
       int material=targetMetal?0:int(floor(o.uv.z+.5))-(o.uv.z>=19.5?20:10);
       [unroll] for(int i=0;i<8;i++)if(i==material) {tex=targetTex[i].Sample(texSampler,o.uv.xy);bump=targetNormal[i].Sample(texSampler,o.uv.xy);}
+      if(targetMetal) { if(o.uv.z>30.5) { tex=hardwareTex[2].Sample(texSampler,o.uv.xy); bump=hardwareTex[3].Sample(texSampler,o.uv.xy); } else { tex=hardwareTex[0].Sample(texSampler,o.uv.xy); bump=hardwareTex[1].Sample(texSampler,o.uv.xy); } }
       if(o.uv.z>=19.5 && !targetMetal) {alpha=tex.a;clip(alpha-.05);}
     } else
     if(o.uv.z<2.5 || o.uv.z>4.5) { tex=lockTex.Sample(texSampler,o.uv.xy); bump=lockNormal.Sample(texSampler,o.uv.xy); }
@@ -588,7 +696,7 @@ float4 ps(O o):SV_Target {
     float3 detail=bump.xyz*2-1;
     // DDS tangent-space normals use the same UV handedness as the mesh.
     if(dot(T,T)>1e-14 && dot(B,B)>1e-14)
-      N=normalize(normalize(T)*detail.x*.55+normalize(B)*detail.y*.55+N*max(.1,detail.z));
+      N=normalize(normalize(T)*detail.x+normalize(B)*detail.y+N*max(.1,detail.z));
     float3 L=normalize(float3(-.65,.4,.65));
     float diffuse=.20+.90*saturate(dot(N,L));
     float specularStrength=o.uv.z>2.5 && o.uv.z<3.5 ? .04 : .18;
@@ -605,13 +713,13 @@ float4 ps(O o):SV_Target {
     if(padPlug || o.uv.z>29.5) specularStrength=.055;
     if(o.uv.z>30.5) tex.rgb*=.85;
     if(safePlug || o.uv.z>30.5) specularStrength=.035;
-    float spec=pow(saturate(dot(N,normalize(L+V))),28)*specularStrength;
+    float spec=pow(saturate(dot(N,normalize(L+V))),28)*specularStrength*bump.a;
     bool pin=o.uv.z>4.5 && o.uv.z<5.5;
     if(pin) {
       // The original pin uses an environment reflection. Approximate a soft
       // studio reflection here so the narrow bronze strip stays legible.
       tex.rgb=tex.rgb*1.65+.018;
-      spec=pow(saturate(dot(N,normalize(L+V))),18)*.38;
+      spec=pow(saturate(dot(N,normalize(L+V))),18)*.38*bump.a;
       spec+=pow(1-saturate(dot(N,V)),3)*.045;
     }
     c*=tex.rgb*diffuse; c+=spec;
@@ -674,42 +782,71 @@ float4 ps(O o):SV_Target {
   bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
   if (FAILED(d->CreateBuffer(&bd, nullptr, &buffer)))
     return false;
-  D3D11_TEXTURE2D_DESC td{};
-  td.Width = td.Height = size;
-  td.MipLevels = td.ArraySize = td.SampleDesc.Count = 1;
-  td.Format = DXGI_FORMAT_D32_FLOAT;
-  td.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-  if (FAILED(d->CreateTexture2D(&td, nullptr, &depth)) ||
-      FAILED(d->CreateDepthStencilView(depth, nullptr, &dsv)))
-    return false;
   D3D11_RASTERIZER_DESC rd{};
   rd.FillMode = D3D11_FILL_SOLID;
   rd.CullMode = D3D11_CULL_NONE;
   rd.DepthClipEnable = TRUE;
   return SUCCEEDED(d->CreateRasterizerState(&rd, &raster));
 }
-bool Renderer::Draw(ID3D11Texture2D *image, const XrView &view,
-                    const Scene &scene, const BackgroundView &backgroundView) {
-  if (!deferred)
-    return false;
-  ID3D11RenderTargetView *rtv = nullptr;
-  if (FAILED(device->CreateRenderTargetView(image, nullptr, &rtv)))
-    return false;
+bool Renderer::Depth(unsigned width, unsigned height) {
+  if (dsv && width == depthWidth && height == depthHeight) return true;
+  release(dsv); release(depth);
+  D3D11_TEXTURE2D_DESC td{};
+  td.Width = width; td.Height = height;
+  td.MipLevels = td.ArraySize = td.SampleDesc.Count = 1;
+  td.Format = DXGI_FORMAT_D32_FLOAT;
+  td.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+  if (FAILED(device->CreateTexture2D(&td, nullptr, &depth)) ||
+      FAILED(device->CreateDepthStencilView(depth, nullptr, &dsv))) return false;
+  depthWidth = width; depthHeight = height;
+  return true;
+}
+void Renderer::RecordEye(unsigned eye, ID3D11Texture2D *image, XrFovf fov) {
+  if (!video.WantsFrame()) return;
+  D3D11_TEXTURE2D_DESC desc{}; image->GetDesc(&desc);
+  ID3D11ShaderResourceView *srv = nullptr;
+  if (FAILED(device->CreateShaderResourceView(image, nullptr, &srv))) {
+    Log("video_error workspace_srv=1"); video.Stop(); return;
+  }
+  CaptureLayer layer;
+  layer.image.image = srv; layer.image.width = desc.Width; layer.image.height = desc.Height;
+  layer.image.rect.extent = {int32_t(desc.Width), int32_t(desc.Height)};
+  layer.image.fov = fov;
+  auto *small = GameFrame(eye, fov, {layer});
+  if (small) video.Copy(eye, small);
+  else { Log("video_error workspace_downsample=1"); video.Stop(); }
+  release(srv);
+}
+SceneGeometry Renderer::BuildScene(const Scene &scene, bool native) {
   Scene shown = scene;
   const TargetAsset *target =
       scene.config.useTargetObject ? Target(scene.targetKind) : nullptr;
   if (target && target->bounds.style != LockStyle::Padlock &&
-      scene.targetOpenTime > 0)
+      targetPresentationTime(scene.config.nativeScene, scene.targetOpenTime) > 0)
     for (auto &tool : shown.tools)
       if (tool.inserted)
         tool.pose = compose(target->Motion(scene.targetOpenTime), tool.pose);
   auto m =
       mesh(shown, hands,
-           propsReady && scene.config.useGameProps ? &props : nullptr, target);
+           propsReady && scene.config.useGameProps ? &props : nullptr, target, plugSkirts,
+           native && propsReady && scene.config.useGameProps ? &nativeParts : nullptr);
+  return {std::move(m.v),std::move(m.draws)};
+}
+bool Renderer::Draw(ID3D11Texture2D *image, const XrView &view,
+                    const Scene &scene, const BackgroundView &backgroundView) {
+  D3D11_TEXTURE2D_DESC dimensions{}; image->GetDesc(&dimensions);
+  if (!deferred || !Depth(dimensions.Width, dimensions.Height))
+    return false;
+  ID3D11RenderTargetView *rtv = nullptr;
+  if (FAILED(device->CreateRenderTargetView(image, nullptr, &rtv)))
+    return false;
+  auto geometry = BuildScene(scene);
+  const auto &vertices = geometry.vertices;
+  const auto *target = scene.config.useTargetObject ? Target(scene.targetKind) : nullptr;
   Vec eye = local(scene.lock, pose(view.pose).p);
   std::vector<Vertex> v;
-  v.reserve(m.v.size());
-  for (auto &x : m.v) {
+  v.reserve(vertices.size());
+  for (auto &x : vertices) {
     auto p = clip(pose(view.pose), world(scene.lock, x.p), view.fov.angleLeft,
                   view.fov.angleRight, view.fov.angleDown, view.fov.angleUp);
     v.push_back({{p[0], p[1], p[2], p[3]},
@@ -720,6 +857,8 @@ bool Renderer::Draw(ID3D11Texture2D *image, const XrView &view,
                  {eye.x - x.p.x, eye.y - x.p.y, eye.z - x.p.z}});
   }
   if (v.size() > vertexCapacity) {
+    Log("mesh_capacity_exceeded vertices=%u capacity=%u", unsigned(v.size()),
+        unsigned(vertexCapacity));
     release(rtv);
     return false;
   }
@@ -733,13 +872,13 @@ bool Renderer::Draw(ID3D11Texture2D *image, const XrView &view,
   deferred->Unmap(buffer, 0);
   float clear[4]{.012f, .018f, .014f, 1.f};
   deferred->ClearRenderTargetView(rtv, clear);
-  background.Draw(deferred, rtv, backgroundView, view.fov, size,
+  background.Draw(deferred, rtv, backgroundView, view.fov, dimensions.Width, dimensions.Height,
                   scene.config.backgroundBlur,
                   scene.config.backgroundBrightness);
   deferred->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH, 1, 0);
   deferred->OMSetRenderTargets(1, &rtv, dsv);
   deferred->RSSetState(raster);
-  D3D11_VIEWPORT viewport{0, 0, float(size), float(size), 0, 1};
+  D3D11_VIEWPORT viewport{0, 0, float(dimensions.Width), float(dimensions.Height), 0, 1};
   deferred->RSSetViewports(1, &viewport);
   unsigned stride = sizeof(Vertex), offset = 0;
   deferred->IASetVertexBuffers(0, 1, &buffer, &stride, &offset);
@@ -749,6 +888,8 @@ bool Renderer::Draw(ID3D11Texture2D *image, const XrView &view,
   deferred->PSSetShader(ps, nullptr, 0);
   deferred->PSSetShaderResources(0, 1, &handTexture);
   deferred->PSSetShaderResources(1, 6, propTextures);
+  deferred->PSSetShaderResources(23, 2, propTextures + 6);
+  deferred->PSSetShaderResources(25, 4, hardwareTextures);
   if (target)
     deferred->PSSetShaderResources(7, 16, targetTextures[target->kind - 1]);
   deferred->OMSetBlendState(blend, nullptr, 0xffffffff);
@@ -777,13 +918,29 @@ bool Renderer::Capture(ID3D11Texture2D *image, const wchar_t *path) {
   bool ok = false;
   if (SUCCEEDED(immediate->Map(read, 0, D3D11_MAP_READ, 0, &map))) {
     if (auto *f = _wfopen(path, L"wb")) {
-      fprintf(f, "P6\n%u %u\n255\n", d.Width, d.Height);
-      for (unsigned y = 0; y < d.Height; y++)
-        for (unsigned x = 0; x < d.Width; x++)
-          fwrite(static_cast<const unsigned char *>(map.pData) +
-                     y * map.RowPitch + x * 4,
-                 1, 3, f);
-      ok = fclose(f) == 0;
+      ok = fprintf(f, "P6\n%u %u\n255\n", d.Width, d.Height) > 0;
+      // The source has four channels and a driver-supplied row pitch. Pack
+      // several RGB rows per write so a high-resolution still doesn't issue
+      // one C runtime call per pixel on the rendering thread.
+      constexpr unsigned blockRows = 16;
+      size_t rowBytes = size_t(d.Width) * 3;
+      std::vector<unsigned char> rgb(rowBytes * blockRows);
+      for (unsigned y = 0; ok && y < d.Height; y += blockRows) {
+        unsigned rows = std::min(blockRows, d.Height - y);
+        for (unsigned row = 0; row < rows; ++row) {
+          auto *src = static_cast<const unsigned char *>(map.pData) +
+                      size_t(y + row) * map.RowPitch;
+          auto *dst = rgb.data() + row * rowBytes;
+          for (unsigned x = 0; x < d.Width; ++x, src += 4, dst += 3) {
+            dst[0] = src[0];
+            dst[1] = src[1];
+            dst[2] = src[2];
+          }
+        }
+        size_t bytes = rows * rowBytes;
+        ok = fwrite(rgb.data(), 1, bytes, f) == bytes;
+      }
+      ok = fclose(f) == 0 && ok;
     }
     immediate->Unmap(read, 0);
   }

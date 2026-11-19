@@ -13,6 +13,7 @@ from prepare_hands import NifFormat, Image
 from PIL import ImageDraw, ImageFont
 
 PLUGIN = "TTWVRLockStage.esp"
+SUPPORTED = {p["model"] for p in json.loads((Path(__file__).resolve().parents[1] / "target_profiles.json").read_text())}
 LEVELS = [
     ("VERY EASY", 0),
     ("EASY", 25),
@@ -415,7 +416,7 @@ def build(a):
                 "row" + str(len(man) * 8 + row),
                 [
                     f"{page * 8 + row + 1:03d}  " + title[:34],
-                    "FULL OBJECT" if path in CORE[:4] else "STANDALONE LOCK",
+                    "FULL OBJECT + WORLD LOCK" if path in SUPPORTED else "STANDALONE LOCK",
                 ],
             )
             y = 512 + row * 448

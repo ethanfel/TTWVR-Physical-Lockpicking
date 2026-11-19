@@ -56,7 +56,8 @@ public:
   FeedbackPlan update(uint64_t now, unsigned stage, float condition,
                       float cylinder, float target, int driver, int pick,
                       unsigned heldButtons, unsigned insertedHands = 0,
-                      unsigned preparedHands = 0, unsigned housingHands = 0) {
+                      unsigned preparedHands = 0, unsigned housingHands = 0,
+                      bool advancing = false) {
     FeedbackPlan plan;
     condition =
         std::isfinite(condition) ? std::clamp(condition, 0.f, 1.f) : 1.f;
@@ -80,7 +81,7 @@ public:
       lastStrain = 0;
     }
     bool straining = touching && turning && stage == 4;
-    bool moving = turning && stage == 3 && target > cylinder + .3f && !touching;
+    bool moving = turning && stage == 3 && (advancing || target > cylinder + .3f) && !touching;
     if (straining)
       plan.pressure = std::clamp((target - cylinder) / 20.f, 0.f, 1.f);
     for (int h = 0; h < 2; h++) {

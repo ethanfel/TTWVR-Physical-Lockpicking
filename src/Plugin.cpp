@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Interaction.h"
+#include "KitRuntime.h"
+#include "WorldLock.h"
+#include "NativeScene.h"
 #include "Shared.h"
 #include <algorithm>
 #include <cmath>
@@ -138,13 +141,57 @@ bool WriteCall(uintptr_t address, void *target) {
   VirtualProtect((void *)address, 5, old, &ignored);
   return true;
 }
+bool InstallVerifiedCalls(const NativeCall *hooks, size_t count) {
+  for (size_t i = 0; i < count; ++i) {
+    const auto &h = hooks[i];
+    int32_t rel = 0;
+    if (!Readable((void *)h.site, 5) || *(unsigned char *)h.site != 0xe8) {
+      Log("native_bypass call_signature=0");
+      return false;
+    }
+    memcpy(&rel, (void *)(h.site + 1), 4);
+    if (h.site + 5 + rel != h.target) {
+      Log("native_bypass call_target=0");
+      return false;
+    }
+  }
+  for (size_t n = 0; n < count; n++)
+    if (!WriteCall(hooks[n].site, hooks[n].replacement)) {
+      while (n) {
+        --n;
+        WriteCall(hooks[n].site, reinterpret_cast<void *>(hooks[n].target));
+      }
+      return false;
+    }
+
+  return true;
+}
+// This call belongs to the native success branch, after UnLock and XP.
+// Player activation, scripted activation and starting the native menu use other sites.
+static bool doorForm(uintptr_t ref) {
+  if (!ref || !Readable(reinterpret_cast<void *>(ref + 0x20), sizeof(uintptr_t))) return false;
+  auto form = *reinterpret_cast<uintptr_t *>(ref + 0x20);
+  return form && Readable(reinterpret_cast<void *>(form + 4), 1) &&
+         *reinterpret_cast<unsigned char *>(form + 4) == 0x1c;
+}
+static bool physicalDoor(uintptr_t ref) {
+  if (!doorForm(ref)) return false;
+  if (IsWorldUnlockPending(ref)) return true;
+  auto c = Current();
+  return c.valid && *reinterpret_cast<uintptr_t *>(c.menu + 0x6c) == ref;
+}
+bool __fastcall ActivateAfterUnlock(uintptr_t ref, void *, uintptr_t actor,
+                                   int a, int b, int c) {
+  if (physicalDoor(ref)) {
+    Log("door_unlocked_waiting_for_player ref=%08x", *reinterpret_cast<unsigned *>(ref + 0xc));
+    return false;
+  }
+  using Activate = bool(__thiscall *)(uintptr_t, uintptr_t, int, int, int);
+  return reinterpret_cast<Activate>(gameBase + 0x173170)(ref, actor, a, b, c);
+}
 void InstallNative() {
   gameBase = uintptr_t(GetModuleHandleW(nullptr));
-  struct Hook {
-    uintptr_t site, target;
-    void *replacement;
-  };
-  Hook hooks[] = {{gameBase + 0x39094d, gameBase + 0x623390,
+  const NativeCall hooks[] = {{gameBase + 0x39094d, gameBase + 0x623390,
                    reinterpret_cast<void *>(PickAxis)},
                   {gameBase + 0x38ed2a, gameBase + 0x623390,
                    reinterpret_cast<void *>(TorqueAxis)},
@@ -169,37 +216,20 @@ void InstallNative() {
                   {gameBase + 0x38fc00, gameBase + 0xb71d0,
                    reinterpret_cast<void *>(InputMode)},
                   {gameBase + 0x390930, gameBase + 0xb71d0,
-                   reinterpret_cast<void *>(InputMode)}};
-  for (auto h : hooks) {
-    int32_t rel = 0;
-    if (!Readable((void *)h.site, 5) || *(unsigned char *)h.site != 0xe8) {
-      Log("native_bypass call_signature=0");
-      return;
-    }
-    memcpy(&rel, (void *)(h.site + 1), 4);
-    if (h.site + 5 + rel != h.target) {
-      Log("native_bypass call_target=0");
-      return;
-    }
-  }
+                   reinterpret_cast<void *>(InputMode)},
+                  {gameBase + 0x38f956, gameBase + 0x173170,
+                   reinterpret_cast<void *>(ActivateAfterUnlock)}};
   originalMode = reinterpret_cast<ModeFn>(gameBase + 0xb71d0);
   originalAxis = reinterpret_cast<AxisFn>(gameBase + 0x623390);
   originalLimit = reinterpret_cast<LimitFn>(gameBase + 0xebd0);
   tileSet = reinterpret_cast<SetFloatFn>(gameBase + 0x6012d0);
   tileGet = reinterpret_cast<GetFloatFn>(gameBase + 0x6011b0);
-  for (unsigned n = 0; n < sizeof(hooks) / sizeof(hooks[0]); n++)
-    if (!WriteCall(hooks[n].site, hooks[n].replacement)) {
-      while (n) {
-        --n;
-        WriteCall(hooks[n].site, reinterpret_cast<void *>(hooks[n].target));
-      }
-      return;
-    }
-
+  if (!InstallVerifiedCalls(hooks, sizeof(hooks) / sizeof(hooks[0]))) return;
   nativeReady = true;
-  Log("native_input_hooks_ready verified_calls=13 native_outcomes_unchanged=1");
+  Log("native_input_hooks_ready verified_calls=14 manual_door_activation=1");
 }
 void __cdecl OnMessage(Message *m) {
+  if (m && (m->type == 2 || m->type == 6 || m->type == 8 || m->type == 14)) ResetKit();
   if (m && m->type == 18) {
     InstallNative();
     return;
@@ -237,8 +267,33 @@ void __cdecl OnMessage(Message *m) {
       next.health = *reinterpret_cast<const float *>(p + 0x94);
     }
   }
+  // Keep the native success transaction off the player's HUD. Restore a live
+  // menu's previous alpha if its reference or transaction changes.
+  static uintptr_t maskedMenu = 0, maskedTile = 0;
+  static float savedAlpha = 255;
+  bool completing = CompleteWorldLock(next);
+  auto root = next.menu ? *reinterpret_cast<uintptr_t *>(next.menu + 4) : 0;
+  if (maskedMenu && (!completing || next.menu != maskedMenu || root != maskedTile)) {
+    if (next.menu == maskedMenu && root == maskedTile && Readable((void *)root, 0x3c))
+      tileSet((void *)root, 0xfa9, savedAlpha, true);
+    maskedMenu = maskedTile = 0;
+  }
+  if (completing) {
+    if (!maskedMenu && nativeReady && Readable((void *)root, 0x3c)) {
+      savedAlpha = tileGet((void *)root, 0xfa9);
+      if (std::isfinite(savedAlpha)) {
+        tileSet((void *)root, 0xfa9, 0.f, true);
+        maskedMenu = next.menu;
+        maskedTile = root;
+      }
+    }
+    return;
+  }
+  if (DismissWorldKitMenu(next.menu)) return;
   UpdateTarget(next);
   UpdateInventory(next);
+  TickKit(next);
+  NativeSceneTick(next);
   std::lock_guard guard(sharedMutex);
   if (next.menu != game.menu || (next.stage != game.stage && next.stage >= 4))
     Log("menu_transition pointer=%p target=%p stage=%u level=%u skill=%u "
@@ -269,8 +324,8 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
   if (!p)
     return false;
   p->infoVersion = 1;
-  p->name = "TTWVR Physical Lockpicking Prototype";
-  p->version = 24;
+  p->name = "TTWVR Physical Lockpicking";
+  p->version = 76;  // Beta 0.1, following internal development builds 1–75.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -283,11 +338,14 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=76 release=\"Beta 0.1\" build=pin-retry", n->runtime);
   // The test installer registers an opt-in layer in this game prefix only.
   // Do not force an undiscoverable explicit layer: initialization must bypass
   // safely.
   InitInventory(n->query(6));
+  InitKit(n->query(6));
+  InitWorldLocks(n->query(6));
+  InitNativeScene(n->query(6));
   auto *m = static_cast<Messaging *>(n->query(2));
   return m && m->listen(n->handle(), "NVSE", OnMessage);
 }

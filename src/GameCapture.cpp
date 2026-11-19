@@ -15,7 +15,7 @@ struct Params {
 };
 } // namespace
 void GameCapture::Reset() {
-  if (size)
+  if (width)
     Log("capture_game_resources released=1");
   drop(vs);
   drop(ps);
@@ -28,9 +28,9 @@ void GameCapture::Reset() {
     drop(targets[n]);
     drop(images[n]);
   }
-  size = 0;
+  width = height = 0;
 }
-bool GameCapture::Init(ID3D11Device *d, unsigned eyeSize) {
+bool GameCapture::Init(ID3D11Device *d, unsigned eyeWidth, unsigned eyeHeight) {
   Reset();
   const char *shader = R"(
 Texture2D image:register(t0); SamplerState linearClamp:register(s0);
@@ -118,7 +118,7 @@ float4 ps(V v):SV_Target {
   if (FAILED(d->CreateRasterizerState(&rd, &raster)))
     return false;
   D3D11_TEXTURE2D_DESC td{};
-  td.Width = td.Height = eyeSize;
+  td.Width = eyeWidth; td.Height = eyeHeight;
   td.ArraySize = td.MipLevels = td.SampleDesc.Count = 1;
   td.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
   td.BindFlags = D3D11_BIND_RENDER_TARGET;
@@ -126,16 +126,16 @@ float4 ps(V v):SV_Target {
     if (FAILED(d->CreateTexture2D(&td, nullptr, &images[n])) ||
         FAILED(d->CreateRenderTargetView(images[n], nullptr, &targets[n])))
       return false;
-  size = eyeSize;
+  width = eyeWidth; height = eyeHeight;
   return true;
 }
 ID3D11Texture2D *GameCapture::Draw(ID3D11Device *device,
                                    ID3D11DeviceContext *immediate, unsigned eye,
-                                   unsigned eyeSize, XrFovf view,
+                                   unsigned eyeWidth, unsigned eyeHeight, XrFovf view,
                                    const std::vector<CaptureLayer> &layers) {
   if (eye > 1 || layers.empty())
     return nullptr;
-  if (size != eyeSize && !Init(device, eyeSize)) {
+  if ((width != eyeWidth || height != eyeHeight) && !Init(device, eyeWidth, eyeHeight)) {
     Reset();
     return nullptr;
   }
@@ -145,7 +145,7 @@ ID3D11Texture2D *GameCapture::Draw(ID3D11Device *device,
   deferred->OMSetRenderTargets(1, &targets[eye], nullptr);
   deferred->OMSetBlendState(blend, nullptr, 0xffffffff);
   deferred->RSSetState(raster);
-  D3D11_VIEWPORT vp{0, 0, float(size), float(size), 0, 1};
+  D3D11_VIEWPORT vp{0, 0, float(width), float(height), 0, 1};
   deferred->RSSetViewports(1, &vp);
   deferred->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   deferred->VSSetShader(vs, nullptr, 0);

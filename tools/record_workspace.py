@@ -3,7 +3,9 @@
 """Record gameplay and the VR lockpicking scene to one MP4 (no audio)."""
 import argparse
 from datetime import datetime
+import itertools
 import json
+import math
 import mmap
 import os
 from pathlib import Path
@@ -99,14 +101,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--plugins', type=Path, required=True)
     ap.add_argument('--output', type=Path, required=True)
-    ap.add_argument('--seconds', type=float, default=60, help='Clip length, up to 600 seconds (default: 60)')
+    ap.add_argument('--seconds', type=float, default=0, help='Optional clip length; 0 records until Ctrl+C (default: 0, no limit)')
     ap.add_argument('--delay', type=float, default=10, help='Time to return to VR (default: 10 seconds)')
     ap.add_argument('--wait', type=float, default=45, help='Wait for the first visible VR frame')
     ap.add_argument('--fps', type=int, default=30, choices=range(10, 31))
     ap.add_argument('--eye', choices=['stereo', 'left', 'right'], default='stereo')
     ap.add_argument('--encoder', choices=['auto', 'nvenc', 'software'], default='auto')
     args = ap.parse_args()
-    if not 0 < args.seconds <= 600 or not 0 <= args.delay <= 300 or not 1 <= args.wait <= 300:
+    if not math.isfinite(args.seconds) or args.seconds < 0 or not 0 <= args.delay <= 300 or not 1 <= args.wait <= 300:
         ap.error('Invalid duration, delay or first-frame wait')
     if not (args.plugins / 'TTWVRPhysicalLockpicking.dll').is_file():
         ap.error('Addon DLL not found in the live plugins folder')
@@ -176,22 +178,38 @@ def main():
         if args.eye != 'stereo':
             cmd += ['-vf', 'crop=iw/2:ih:' + ('0' if args.eye == 'left' else 'iw/2') + ':0']
         cmd += ['-c:v', codec, *settings, '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-n', str(target)]
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=encoder_log)
-        print(f'Recording {args.seconds:g}s to {target}\nCtrl+C finishes the clip early. No audio is recorded.', flush=True)
+        # Ctrl+C belongs to the recorder. Finish its current raw frame, then send
+        # EOF so FFmpeg can flush the encoder and finalize the MP4 normally.
+        child_group = ({'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP}
+                       if os.name == 'nt' else {'start_new_session': True})
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                                stderr=encoder_log, **child_group)
+        length = f'{args.seconds:g}s' if args.seconds else 'until Ctrl+C'
+        print(f'Recording {length} to {target}\nCtrl+C finishes and saves the clip. No audio is recorded.', flush=True)
         start = time.monotonic()
         previous = None
         last = frame
-        total = max(1, round(args.seconds * args.fps))
+        frames = range(max(1, round(args.seconds * args.fps))) if args.seconds else itertools.count()
+        finish = False
+        def finish_recording(signum, frame):
+            nonlocal finish
+            finish = True
+        old_handlers = {sig: signal.signal(sig, finish_recording)
+                        for sig in (signal.SIGINT, signal.SIGTERM)}
         try:
-            for n in range(total):
+            for n in frames:
+                if finish:
+                    break
                 delay = start + n / args.fps - time.monotonic()
                 if delay > 0:
                     time.sleep(delay)
+                if finish:
+                    break
                 fresh = stream.frame(previous)
                 # Allow a just-late producer to publish before duplicating.
                 # This wait affects only the recorder, never the VR process.
                 source_deadline = start + (n + .5) / args.fps
-                while fresh is None and time.monotonic() < source_deadline:
+                while fresh is None and time.monotonic() < source_deadline and not finish:
                     time.sleep(.001)
                     fresh = stream.frame(previous)
                 if fresh:
@@ -209,8 +227,10 @@ def main():
                 previous = number
                 proc.stdin.write(pixels)
                 written += 1
-        except KeyboardInterrupt:
-            interrupted = True
+        finally:
+            interrupted = finish
+            for sig, handler in old_handlers.items():
+                signal.signal(sig, handler)
         proc.stdin.close()
         if proc.wait(timeout=30) != 0:
             raise RuntimeError('FFmpeg failed; see the saved encoder log.')
