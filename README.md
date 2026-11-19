@@ -18,7 +18,7 @@ The addon takes controller input and haptics from the backend TTWVR selects, inc
 
 ## Your first lock
 
-1. In the **large floating Pip-Boy**, highlight **Items → Misc → Bobby Pin**. Hold **Hotkey**, choose a wheel direction, then release it. Place that holster within reach of both hands.
+1. Highlight **Items → Misc → Bobby Pin**. On the **WristBoy**, click the right stick, tilt it toward a slot, then let it return to center. On the floating **PauseBoy**, hold **Hotkey**, choose a wheel direction, then release Hotkey. Both menus bind the same holster. Place it within reach of both hands.
 2. Draw with either hand to take a pin. Bend it with both hands, then draw the screwdriver from the same holster with your free hand.
 3. Seat the pin in the keyhole. Press the screwdriver blade into the lower slot and push the handle sideways. If you feel resistance, ease off and adjust the pin. A replacement pin keeps the same sweet spot on that lock.
 

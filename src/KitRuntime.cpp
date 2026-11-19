@@ -236,6 +236,7 @@ bool init() {
   Log("kit_native_centers installed=%d", InstallVerifiedCalls(&centerHook, 1));
   Log("bobby_pin_inventory_favourite installed=%d",
       InstallPinFavourite(uintptr_t(GetModuleHandleW(nullptr))));
+  Log("bobby_pin_wrist_favourite installed=%d", InstallWristPinFavourite(uintptr_t(m), version117));
   return true;
 }
 int run(void *script) {

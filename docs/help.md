@@ -3,7 +3,7 @@
 | What you see | What to check |
 | --- | --- |
 | The game starts with ordinary lockpicking | Confirm the mod and `TTWVRLockKit.esp` are enabled and that TTWVR is 1.1.6 or 1.1.7. For a manual install, check that the ESP is directly in `Data`. |
-| I can’t assign the pin | Open the **large floating Pip-Boy**, highlight a bobby pin under **Items → Misc**, hold Hotkey, select a wheel direction, then release. |
+| I can’t assign the pin | Carry at least one bobby pin and highlight it under **Items → Misc**. In **WristBoy**, keep the other hand near the wrist screen, click the right stick, tilt it toward a slot, then center it to confirm. In **PauseBoy**, hold Hotkey, choose a direction, then release Hotkey. |
 | A particular object has no usable world lock | Stow the tools and activate it for the close-up interaction. Live placement covers 101 model paths, including standard safes, ammo boxes, toolboxes and many doors. Replacement meshes can move the latch. |
 
 On supported doors and containers, the physical lock stays visible even when your Lockpick skill is too low. It disappears when the object is unlocked, including when the other side of a door is unlocked.
