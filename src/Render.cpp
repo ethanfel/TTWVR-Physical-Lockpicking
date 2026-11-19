@@ -446,6 +446,10 @@ bool Renderer::LoadHands() {
   fclose(file);
   if (!ok)
     return false;
+  if (!device) {
+    for (int h = 0; h < 2; ++h) hands[h] = std::move(loaded[h]);
+    return true;
+  }
   path = folder + L"\\TTWVRPhysicalLockpicking\\hands.rgba";
   file = _wfopen(path.c_str(), L"rb");
   if (!file)
@@ -530,7 +534,7 @@ bool Renderer::LoadProps() {
   bool ok = readProps(f, loaded);
   if (f)
     fclose(f);
-  if (ok)
+  if (ok && device)
     for (int i = 0; i < 8; i++) {
       std::wstring name = i >= 6 ? (i == 6 ? L"pin-metal.rgba" : L"pin-metal-n.rgba") :
           L"props-" + std::to_wstring(i % 3) + (i < 3 ? L".rgba" : L"-n.rgba");
@@ -541,10 +545,10 @@ bool Renderer::LoadProps() {
     }
   // Texture uploads are recorded on our context; execute with game state saved.
   ID3D11CommandList *commands = nullptr;
-  if (SUCCEEDED(deferred->FinishCommandList(FALSE, &commands))) {
+  if (deferred && SUCCEEDED(deferred->FinishCommandList(FALSE, &commands))) {
     immediate->ExecuteCommandList(commands, TRUE);
     release(commands);
-  } else
+  } else if (deferred)
     ok = false;
   if (!ok) {
     for (auto &t : propTextures)
@@ -585,7 +589,7 @@ void Renderer::EnsureTarget(unsigned k) {
     bool ok = readTarget(f, k, asset);
     if (f)
       fclose(f);
-    if (ok)
+    if (ok && device)
       for (unsigned m = 0; m < asset.materials && ok; m++)
         for (unsigned channel = 0; channel < 2; channel++) {
           auto path = root + prefix + L"-" + std::to_wstring(m) +
@@ -595,10 +599,10 @@ void Renderer::EnsureTarget(unsigned k) {
             ok = false;
         }
     ID3D11CommandList *commands = nullptr;
-    if (SUCCEEDED(deferred->FinishCommandList(FALSE, &commands))) {
+    if (deferred && SUCCEEDED(deferred->FinishCommandList(FALSE, &commands))) {
       immediate->ExecuteCommandList(commands, TRUE);
       release(commands);
-    } else
+    } else if (deferred)
       ok = false;
     if (ok) {
       targets[k - 1] = std::move(asset);
@@ -611,6 +615,11 @@ void Renderer::EnsureTarget(unsigned k) {
       Log("target_asset kind=%u loaded=0 fallback=standalone", k);
     }
   }
+}
+bool Renderer::InitNative() {
+  if (!LoadHands()) return false;
+  propsReady = LoadProps();
+  return propsReady;
 }
 bool Renderer::Init(ID3D11Device *d) {
   device = d;

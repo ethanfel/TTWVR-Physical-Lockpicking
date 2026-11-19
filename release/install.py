@@ -3,7 +3,7 @@
 """Guided preparation for a managed TTWVR Physical Lockpicking installation."""
 import hashlib
 import os
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 import subprocess
 import sys
 
@@ -61,18 +61,6 @@ def main():
     output = mods / MOD
     if output.exists():
         raise ValueError(f"{output} already exists. For an update or a second profile, use the manual preparation command in the guide.")
-    windows_game = str(game)
-    manager = None
-    if os.name != "nt":
-        windows_game = ask("Game path as seen by Proton (Enter accepts the usual Z: mapping)",
-                           str(PureWindowsPath("Z:/", *game.parts[1:])))
-        if not PureWindowsPath(windows_game).is_absolute() or any(c in windows_game for c in '"\r\n'):
-            raise ValueError("Use an absolute Wine path to the managed game.")
-    else:
-        default_manager = mods.parent / "ModOrganizer.exe"
-        manager = local(ask("ModOrganizer.exe used to launch TTWVR", default_manager))
-        if not manager.is_file() or manager.suffix.lower() != ".exe":
-            raise ValueError("Select the installed mod manager executable.")
     print(f"\nUsing TTWVR {SUPPORTED[digest]} in {host}\nPreparing {output}", flush=True)
     env = HERE / ".venv"
     python = env / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
@@ -81,17 +69,7 @@ def main():
     subprocess.run([str(python), "-m", "pip", "install", "-r", str(HERE / "requirements.txt")], check=True)
     subprocess.run([str(python), str(HERE / "prepare.py"), "--data", str(data), "--ttwvr", str(host),
                     "--mods", str(mods), "--modlist", str(profile), "--output", str(output)], check=True)
-    subprocess.run([str(python), str(HERE / "openxr.py"), "--game", windows_game, "--output", str(HERE)], check=True)
-    if manager:
-        launcher = HERE / "Play-TTWVR.cmd"
-        # Keep the path in a UTF-8 line after switching cmd.exe's code page.
-        # Quoting handles spaces and shell metacharacters, %% is a literal %.
-        path = str(manager).replace("%", "%%")
-        directory = str(manager.parent).replace("%", "%%")
-        lines = ["@echo off", "chcp 65001 >nul", "setlocal DisableDelayedExpansion",
-                 'set "TTWVR_PHYSICAL_LOCKPICKING=1"', f'start "" /D "{directory}" "{path}"']
-        launcher.write_bytes(("\r\n".join(lines) + "\r\n").encode("utf-8"))
-    print("\nPrepared. Continue with step 3 in the installation guide for your platform.")
+    print("\nPrepared. Enable the generated mod and TTWVRLockKit.esp in your VR profile.")
 
 
 if __name__ == "__main__":

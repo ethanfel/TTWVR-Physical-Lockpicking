@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Prepare private native scene buffers/materials from locally prepared assets.
-Never redistribute the generated game-derived NIFs or textures.
+"""Prepare native scene meshes. Release meshes use installed game texture paths.
+The default produces a developer workspace with local material copies.
 """
 import argparse, io, struct, json, os, hashlib
 from pathlib import Path
@@ -99,26 +99,53 @@ def layout(assets, kind):
         result[id]=(surface,name,count)
     return result
 
+def game_materials(assets):
+    # Source paths are virtual Data paths read from the original model. Using
+    # them lets the engine apply the player's texture overrides at load time.
+    paths = {'hands': json.loads((assets/'hands-source.json').read_text())['texture']}
+    for i, stem in enumerate((r'textures\terminals\lockinterface01',
+                              r'textures\clutter\bobbypin\bobbypinbox',
+                              r'textures\clutter\junk\tincan01')):
+        paths[f'props-{i}'] = stem + '.dds'
+        paths[f'props-{i}-n'] = stem + '_n.dds'
+    for model in json.loads((assets/'targets-source.json').read_text())['models']:
+        for m, pair in enumerate(model['materials']):
+            for suffix, path in zip(('', '-n'), pair):
+                paths[f"target-{model['kind']}-{m}{suffix}"] = path
+    for key in ('pin-metal','pin-metal-n','flat-n','white'):
+        paths[key] = 'textures/TTWVRPhysicalLockpicking/' + key + '.dds'
+    for key,path in paths.items():
+        path = path.replace('/', chr(92))
+        if not path.lower().startswith('textures' + chr(92)) or '..' in path or ':' in path:
+            raise ValueError(f'Invalid virtual texture for {key}: {path}')
+        paths[key] = path
+    return paths
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--assets',type=Path,required=True)
     ap.add_argument('--data',type=Path,required=True)
     ap.add_argument('--output',type=Path,required=True)
     ap.add_argument('--kind',type=int,action='append')
+    ap.add_argument('--game-materials', action='store_true', help='Reference installed game textures in release meshes')
     ap.add_argument('--rebind-textures',action='store_true',help='Share identical textures in existing templates without rebuilding their geometry')
     a=ap.parse_args()
     meshes=a.output/'meshes/TTWVRPhysicalLockpicking';textures=a.output/'textures/TTWVRPhysicalLockpicking'
     meshes.mkdir(parents=True,exist_ok=True);textures.mkdir(parents=True,exist_ok=True)
-    for p in a.assets.glob('*.rgba'):
-        dest=textures/(p.stem+'.dds')
-        if dest.exists() and dest.stat().st_mtime>=p.stat().st_mtime:continue
-        raw=p.read_bytes();w,h=struct.unpack_from('<II',raw)
-        assert len(raw)==8+w*h*4 and 0<w<=8192 and 0<h<=8192
-        dds(textures/(p.stem+'.dds'),Image.frombytes('RGBA',(w,h),raw[8:]))
-    dds(textures/'white.dds',Image.new('RGBA',(4,4),(255,255,255,255)))
-    dds(textures/'flat-n.dds',Image.new('RGBA',(4,4),(128,128,255,0)))
-    aliases=texture_aliases(textures)
-    (a.output/'native-texture-aliases.json').write_text(json.dumps(aliases,indent=2)+'\n')
+    if a.game_materials:
+        material_paths = game_materials(a.assets)
+    else:
+        for p in a.assets.glob('*.rgba'):
+            dest=textures/(p.stem+'.dds')
+            if dest.exists() and dest.stat().st_mtime>=p.stat().st_mtime:continue
+            raw=p.read_bytes();w,h=struct.unpack_from('<II',raw)
+            assert len(raw)==8+w*h*4 and 0<w<=8192 and 0<h<=8192
+            dds(textures/(p.stem+'.dds'),Image.frombytes('RGBA',(w,h),raw[8:]))
+        dds(textures/'white.dds',Image.new('RGBA',(4,4),(255,255,255,255)))
+        dds(textures/'flat-n.dds',Image.new('RGBA',(4,4),(128,128,255,0)))
+        aliases=texture_aliases(textures)
+        (a.output/'native-texture-aliases.json').write_text(json.dumps(aliases,indent=2)+'\n')
+        material_paths = {name: f'textures\\TTWVRPhysicalLockpicking\\{value}.dds' for name,value in aliases.items()}
     if a.rebind_textures:
         paths=[meshes/f'workspace-{k}.nif' for k in a.kind] if a.kind else sorted(meshes.glob('workspace-*.nif'))
         for path in paths:print('shared texture paths',path.name,rebind_template(path,aliases),flush=True)
@@ -176,9 +203,8 @@ def main():
             mat.glossiness=material.glossiness;mat.alpha=1
             mat.ambient_color.r=mat.ambient_color.g=mat.ambient_color.b=1
             mat.diffuse_color.r=mat.diffuse_color.g=mat.diffuse_color.b=1
-            sh.texture_set.textures[0]=f'textures\\TTWVRPhysicalLockpicking\\{aliases[name]}.dds'.encode()
-            normal=name+'-n' if (textures/(name+'-n.dds')).exists() else 'flat-n'
-            sh.texture_set.textures[1]=f'textures\\TTWVRPhysicalLockpicking\\{aliases[normal]}.dds'.encode()
+            sh.texture_set.textures[0]=material_paths[name].encode()
+            sh.texture_set.textures[1]=material_paths.get(name+'-n',material_paths['flat-n']).encode()
             for n in range(2,sh.texture_set.num_textures):sh.texture_set.textures[n]=b''
             sh.shader_flags.sf_specular=surface not in (1,3)
             sh.shader_flags.sf_skinned=0;sh.shader_flags.sf_environment_mapping=0

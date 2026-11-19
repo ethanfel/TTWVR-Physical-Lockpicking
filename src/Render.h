@@ -120,6 +120,7 @@ public:
   }
   ~Renderer();
   bool Init(ID3D11Device *d);
+  bool InitNative();
   SceneGeometry BuildScene(const Scene &scene, bool native = false);
   bool Draw(ID3D11Texture2D *image, const XrView &view, const Scene &scene,
             const BackgroundView &backgroundView = {});

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "KitRuntime.h"
 #include "Kit.h"
+#include "HostInput.h"
 #include "WorldPin.h"
 #include "WorldLock.h"
 #include "PinFavourite.h"
@@ -157,10 +158,11 @@ bool init() {
   auto digest = hashFile(m);
   // Read-only bone and slot layouts shared with the private holster
   // calibration.
-  const bool version117 =
+  const bool version117 = digest ==
+      "119a085a5b0101f0618b8e076a421b4b89e30d72d9b6eae874f4e5af7bd3fb27" ||
       digest ==
       "ae7dc0d7ba94651af0ccd729122f623d3dbdf0b85c6c787838c04bbc721135d6";
-  if (digest ==
+  if (digest == "503266c4f4c2350b357c8c15021d8bde28973254745d9302b8e3cfde66489a27" || digest ==
       "63712922499b2155a3d2c6f54abbdfc1eaf95d08712b937c6276d6a8ae0d774d")
     layout = {286039420, 291467216, 285330768, 291471160,
               291471288, 286043596, 286058864};
@@ -171,6 +173,7 @@ bool init() {
     Log("kit_disabled unknown_holster_layout=1");
     return false;
   }
+  InstallHostInput(uintptr_t(m), version117);
   host = uintptr_t(m) - 0x10000000;
   slotQuery = api->compile("begin Function {}\nSetFunctionValue (Call "
                            "(CompileScript \"TTWVRLockKit/Slot.txt\"))\nend");

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Interaction.h"
 #include "KitRuntime.h"
+#include "HostInput.h"
+#include "MotionShaders.h"
 #include "WorldLock.h"
 #include "NativeScene.h"
 #include "Shared.h"
@@ -273,12 +275,13 @@ void __cdecl OnMessage(Message *m) {
   static float savedAlpha = 255;
   bool completing = CompleteWorldLock(next);
   auto root = next.menu ? *reinterpret_cast<uintptr_t *>(next.menu + 4) : 0;
-  if (maskedMenu && (!completing || next.menu != maskedMenu || root != maskedTile)) {
+  const bool hideMenu = completing || HostMenuPresented(next.menu);
+  if (maskedMenu && (!hideMenu || next.menu != maskedMenu || root != maskedTile)) {
     if (next.menu == maskedMenu && root == maskedTile && Readable((void *)root, 0x3c))
       tileSet((void *)root, 0xfa9, savedAlpha, true);
     maskedMenu = maskedTile = 0;
   }
-  if (completing) {
+  if (hideMenu) {
     if (!maskedMenu && nativeReady && Readable((void *)root, 0x3c)) {
       savedAlpha = tileGet((void *)root, 0xfa9);
       if (std::isfinite(savedAlpha)) {
@@ -287,7 +290,7 @@ void __cdecl OnMessage(Message *m) {
         maskedTile = root;
       }
     }
-    return;
+    if (completing) return;
   }
   if (DismissWorldKitMenu(next.menu)) return;
   UpdateTarget(next);
@@ -335,14 +338,12 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
   wchar_t enabled[8]{}, disabled[8]{};
   GetEnvironmentVariableW(L"TTWVR_PHYSICAL_LOCKPICKING", enabled, 8);
   GetEnvironmentVariableW(L"DISABLE_TTWVR_PHYSICAL_LOCKPICKING", disabled, 8);
-  if (wcscmp(enabled, L"1") || disabled[0]) {
+  if (!wcscmp(enabled, L"0") || disabled[0]) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=76 release=\"Beta 0.1\" build=visible-locks", n->runtime);
-  // The test installer registers an opt-in layer in this game prefix only.
-  // Do not force an undiscoverable explicit layer: initialization must bypass
-  // safely.
+  Log("plugin_loaded runtime=%08x probe_only=0 version=76 release=\"Beta 0.1\" build=host-input", n->runtime);
+  InitMotionShaders();
   InitInventory(n->query(6));
   InitKit(n->query(6));
   InitWorldLocks(n->query(6), n->query(5));

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "Feedback.h"
+#include "HostInput.h"
+#include <atomic>
 #include "NativeScene.h"
 #include "KitRuntime.h"
 #include "Kit.h"
@@ -74,7 +76,12 @@ struct Eye {
   XrSwapchain chain = XR_NULL_HANDLE;
   std::vector<XrSwapchainImageD3D11KHR> images;
 };
+std::atomic<unsigned> layerOwners{0};
+std::atomic<uintptr_t> hostPresented{0};
 struct Session {
+  const HostFrame *hostFrame = nullptr;
+  void *backend = nullptr;
+  HostPulse hostPulse = nullptr;
   std::shared_ptr<Instance> api;
   XrSession handle = XR_NULL_HANDLE;
   ID3D11Device *device = nullptr;
@@ -251,16 +258,28 @@ bool CreateInputs(Instance &i) {
   Log("wmr_bindings result=%d", r);
   return true;
 }
-void StopFeedback(Session &s) {
+XrResult SendFeedback(Session &s, int hand, bool kit, const Pulse *pulse) {
+  if (s.backend) {
+    // The host accepts seconds. OpenVR pulses expire on their own.
+    if (pulse) s.hostPulse(s.backend, hand != 0, pulse->amplitude, pulse->durationMs * .001f);
+    else s.hostPulse(s.backend, hand != 0, 0.f, .001f);
+    return XR_SUCCESS;
+  }
   auto &i = *s.api;
-  unsigned active = s.feedback.active(GetTickCount64());
-  for (int n = 0; n < 2; n++)
-    if (active & (1u << n)) {
-      XrHapticActionInfo hi{XR_TYPE_HAPTIC_ACTION_INFO};
-      hi.action = i.haptic;
-      hi.subactionPath = i.hands[n];
-      i.StopHapticFeedback(s.handle, &hi);
-    }
+  XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};
+  info.action = kit ? i.kitHaptic : i.haptic;
+  info.subactionPath = i.hands[hand];
+  if (!pulse) return i.StopHapticFeedback(s.handle, &info);
+  XrHapticVibration vibration{XR_TYPE_HAPTIC_VIBRATION};
+  vibration.duration = XrDuration(pulse->durationMs) * 1000000;
+  vibration.amplitude = pulse->amplitude;
+  vibration.frequency = XR_FREQUENCY_UNSPECIFIED;
+  return i.ApplyHapticFeedback(s.handle, &info, reinterpret_cast<XrHapticBaseHeader *>(&vibration));
+}
+void StopFeedback(Session &s) {
+  const auto active = s.feedback.active(GetTickCount64());
+  for (int n = 0; n < 2; ++n)
+    if (active & (1u << n)) SendFeedback(s, n, false, nullptr);
   s.feedback.reset();
 }
 struct AppChain {
@@ -392,6 +411,7 @@ XrResult XRAPI_CALL ReleaseAppImage(XrSwapchain h,
 }
 void Clean(Session &s) {
   StopFeedback(s);
+  if (s.attached) --layerOwners;
   auto &i = *s.api;
   for (auto it = appChains.begin(); it != appChains.end();)
     if (it->second.session == &s)
@@ -420,10 +440,10 @@ void Neutral() {
 bool ReadyRenderer(Session &s) {
   if (s.renderer)
     return true;
-  if (s.failed || !s.device)
+  if (s.failed || (!s.device && !s.backend))
     return false;
   s.renderer = std::make_unique<Renderer>();
-  if (!s.renderer->Init(s.device)) {
+  if (!(s.backend ? s.renderer->InitNative() : s.renderer->Init(s.device))) {
     s.renderer.reset();
     s.failed = true;
     Log("render_bypass init_failed=1");
@@ -634,7 +654,7 @@ XrResult XRAPI_CALL Attach(XrSession h,
   copy.actionSets = sets.data();
   copy.countActionSets = sets.size();
   auto r = i.AttachSessionActionSets(h, &copy);
-  s.attached = XR_SUCCEEDED(r);
+  if (XR_SUCCEEDED(r) && !s.attached) { s.attached = true; ++layerOwners; }
   Log("input_attached result=%d", r);
   if (XR_FAILED(r))
     return i.AttachSessionActionSets(h, c);
@@ -721,78 +741,15 @@ XrResult XRAPI_CALL AppActionSet(XrInstance h, const XrActionSetCreateInfo *c,
       c->priority, r);
   return r;
 }
-XrResult XRAPI_CALL Sync(XrSession h, const XrActionsSyncInfo *c) {
-  auto &s = *sessions.at(h);
-  auto &i = *s.api;
-  auto g = Snapshot();
-  UpdateMenu(s, g);
-  bool active = s.attached && s.focused && !s.failed && NativeReady() &&
-                g.menu && g.menu != s.bypassMenu;
-  bool capture = active && s.presenting;
-  if (capture != s.captureInputs)
-    Log("input_capture active=%d original_back_preserved=1", capture);
-  s.captureInputs = capture; // Stable for every read until the next sync.
-  bool observeKit=!g.menu && g.kitSlot && i.kitSet && s.attached && s.focused;
-  auto copy = *c;
-  // A menu, unbinding the kit, or a focus change can stow both tools while
-  // their buttons are still down. Continue sampling until each button is up.
-  const bool sampleKit = observeKit ||
-      (s.kitWeapons.awaitingRelease() && i.kitSet && s.attached && s.focused);
-  unsigned extra = unsigned(sampleKit) + unsigned(active);
-#ifdef LOCKPICK_TEST_INPUT
-  ++extra;
-#endif
-  if (extra) {
-    auto &sets = s.activeSets;
-    sets.clear();
-    sets.reserve(size_t(c->countActiveActionSets) + extra);
-    if (c->countActiveActionSets)
-      sets.insert(sets.end(), c->activeActionSets, c->activeActionSets + c->countActiveActionSets);
-    if (sampleKit) sets.push_back({i.kitSet, XR_NULL_PATH});
-    if (active) sets.push_back({i.set, XR_NULL_PATH});
-#ifdef LOCKPICK_TEST_INPUT
-    sets.push_back({i.probeSet, XR_NULL_PATH});
-#endif
-    copy.activeActionSets = sets.data();
-    copy.countActiveActionSets = unsigned(sets.size());
-  }
-  auto r = i.SyncActions(h, &copy);
+struct KitSample {
   unsigned valid=0,triggers=0,grips=0,gripActive=0,triggerActive=0;
   Vec palms[2]{};
   Pose kitController[2]{};
   unsigned trackedGrips = 0;
   XrTime gripTime[2]{}, triggerTime[2]{};
-  if (sampleKit && XR_SUCCEEDED(r)) {
-    for(int n=0;n<2;n++) {
-      XrActionStateGetInfo get{XR_TYPE_ACTION_STATE_GET_INFO};
-      get.subactionPath=i.hands[n];get.action=i.kitSqueeze;
-      XrActionStateFloat f{XR_TYPE_ACTION_STATE_FLOAT};
-      XrActionStateBoolean b{XR_TYPE_ACTION_STATE_BOOLEAN};
-      bool hasFloat=XR_SUCCEEDED(i.GetActionStateFloat(h,&get,&f)) && f.isActive;
-      get.action=i.kitClick;
-      bool hasClick=XR_SUCCEEDED(i.GetActionStateBoolean(h,&get,&b)) && b.isActive;
-      get.action=i.kitTrigger;
-      XrActionStateFloat trigger{XR_TYPE_ACTION_STATE_FLOAT};
-      bool hasTrigger=XR_SUCCEEDED(i.GetActionStateFloat(h,&get,&trigger)) && trigger.isActive;
-      if (hasFloat || hasClick) gripActive |= 1u<<n;
-      if (hasTrigger) triggerActive |= 1u<<n;
-      if (hasTrigger && trigger.currentState>=.65f) triggers |= 1u<<n;
-      if((hasFloat && f.currentState>=.55f) || (hasClick && b.currentState)) grips|=1u<<n;
-      if (!observeKit) continue;
-      XrSpaceLocation location{XR_TYPE_SPACE_LOCATION};
-      if(!s.kitSpaces[n] || XR_FAILED(i.LocateSpace(s.kitSpaces[n],s.localSpace,s.predictedTime,&location)) ||
-         !(location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT)) continue;
-      kitController[n]=pose(location.pose);
-      palms[n]=kitController[n].p;
-      if (location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT)
-        trackedGrips |= 1u << n;
-      if (hasFloat && f.currentState >= .55f) gripTime[n] = f.lastChangeTime;
-      if (hasClick && b.currentState && (!gripTime[n] || b.lastChangeTime < gripTime[n]))
-        gripTime[n] = b.lastChangeTime;
-      if (triggers & (1u << n)) triggerTime[n] = trigger.lastChangeTime;
-      if(hasFloat || hasClick || hasTrigger) valid|=1u<<n;
-    }
-  }
+};
+void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit, bool sampleKit, bool succeeded) {
+  auto &[valid,triggers,grips,gripActive,triggerActive,palms,kitController,trackedGrips,gripTime,triggerTime] = sample;
   if (sampleKit) SampleKitControllers(kitController, trackedGrips);
   static bool kitTrace=GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE",nullptr,0)>0;
   static ULONGLONG kitTraceTime=0;
@@ -830,7 +787,7 @@ XrResult XRAPI_CALL Sync(XrSession h, const XrActionsSyncInfo *c) {
       gripTime[n] = triggerTime[n];
   KitButtons(down,valid,inRange & valid,s.kitPressOrder.update(down,gripTime),
              controls.uncertainRelease);
-  if(observeKit && XR_SUCCEEDED(r)) {
+  if(observeKit && succeeded) {
     int driver = g.worldPick>=0 && (g.kitDrawn&2) ? 1-g.worldPick : -1;
     const unsigned inserted=g.worldSeated & ~s.previousSeated;
     for (int n=0;n<2;++n) {
@@ -842,16 +799,10 @@ XrResult XRAPI_CALL Sync(XrSession h, const XrActionsSyncInfo *c) {
     auto plan=s.worldFeedback.update(GetTickCount64(),g.worldStage,g.worldHealth,
         g.worldCylinder,g.worldDemand,driver,(g.kitDrawn & 1) ? g.worldPick : -1,down,inserted,g.worldPrepared,s.pendingHousing);
     for(int n=0;n<2;++n) {
-      XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};
-      info.action=i.kitHaptic;info.subactionPath=i.hands[n];
-      if(plan.stop & (1u<<n)) i.StopHapticFeedback(h,&info);
-      auto pulse=plan.pulses[n];
-      if(pulse.cue==Cue::None) continue;
-      XrHapticVibration vibration{XR_TYPE_HAPTIC_VIBRATION};
-      vibration.duration=XrDuration(pulse.durationMs)*1000000;
-      vibration.amplitude=pulse.amplitude;
-      vibration.frequency=XR_FREQUENCY_UNSPECIFIED;
-      auto result=i.ApplyHapticFeedback(h,&info,reinterpret_cast<XrHapticBaseHeader*>(&vibration));
+      if (plan.stop & (1u<<n)) SendFeedback(s,n,true,nullptr);
+      const auto &pulse=plan.pulses[n];
+      if (pulse.cue==Cue::None) continue;
+      auto result=SendFeedback(s,n,true,&pulse);
       if (pulse.cue==Cue::Housing) s.pendingHousing &= ~(1u<<n);
       if (kitTrace) Log("live_haptic hand=%d cue=%s result=%d",n,cueName(pulse.cue),int(result));
     }
@@ -877,6 +828,77 @@ XrResult XRAPI_CALL Sync(XrSession h, const XrActionsSyncInfo *c) {
       lastRoute=current;
     }
   }
+}
+XrResult XRAPI_CALL Sync(XrSession h, const XrActionsSyncInfo *c) {
+  auto &s = *sessions.at(h);
+  auto &i = *s.api;
+  auto g = Snapshot();
+  UpdateMenu(s, g);
+  bool active = s.attached && s.focused && !s.failed && NativeReady() &&
+                g.menu && g.menu != s.bypassMenu;
+  bool capture = active && s.presenting;
+  if (capture != s.captureInputs)
+    Log("input_capture active=%d original_back_preserved=1", capture);
+  s.captureInputs = capture; // Stable for every read until the next sync.
+  bool observeKit=!g.menu && g.kitSlot && i.kitSet && s.attached && s.focused;
+  auto copy = *c;
+  // A menu, unbinding the kit, or a focus change can stow both tools while
+  // their buttons are still down. Continue sampling until each button is up.
+  const bool sampleKit = observeKit ||
+      (s.kitWeapons.awaitingRelease() && i.kitSet && s.attached && s.focused);
+  unsigned extra = unsigned(sampleKit) + unsigned(active);
+#ifdef LOCKPICK_TEST_INPUT
+  ++extra;
+#endif
+  if (extra) {
+    auto &sets = s.activeSets;
+    sets.clear();
+    sets.reserve(size_t(c->countActiveActionSets) + extra);
+    if (c->countActiveActionSets)
+      sets.insert(sets.end(), c->activeActionSets, c->activeActionSets + c->countActiveActionSets);
+    if (sampleKit) sets.push_back({i.kitSet, XR_NULL_PATH});
+    if (active) sets.push_back({i.set, XR_NULL_PATH});
+#ifdef LOCKPICK_TEST_INPUT
+    sets.push_back({i.probeSet, XR_NULL_PATH});
+#endif
+    copy.activeActionSets = sets.data();
+    copy.countActiveActionSets = unsigned(sets.size());
+  }
+  auto r = i.SyncActions(h, &copy);
+  KitSample sample{};
+  auto &[valid,triggers,grips,gripActive,triggerActive,palms,kitController,trackedGrips,gripTime,triggerTime] = sample;
+  if (sampleKit && XR_SUCCEEDED(r)) {
+    for(int n=0;n<2;n++) {
+      XrActionStateGetInfo get{XR_TYPE_ACTION_STATE_GET_INFO};
+      get.subactionPath=i.hands[n];get.action=i.kitSqueeze;
+      XrActionStateFloat f{XR_TYPE_ACTION_STATE_FLOAT};
+      XrActionStateBoolean b{XR_TYPE_ACTION_STATE_BOOLEAN};
+      bool hasFloat=XR_SUCCEEDED(i.GetActionStateFloat(h,&get,&f)) && f.isActive;
+      get.action=i.kitClick;
+      bool hasClick=XR_SUCCEEDED(i.GetActionStateBoolean(h,&get,&b)) && b.isActive;
+      get.action=i.kitTrigger;
+      XrActionStateFloat trigger{XR_TYPE_ACTION_STATE_FLOAT};
+      bool hasTrigger=XR_SUCCEEDED(i.GetActionStateFloat(h,&get,&trigger)) && trigger.isActive;
+      if (hasFloat || hasClick) gripActive |= 1u<<n;
+      if (hasTrigger) triggerActive |= 1u<<n;
+      if (hasTrigger && trigger.currentState>=.65f) triggers |= 1u<<n;
+      if((hasFloat && f.currentState>=.55f) || (hasClick && b.currentState)) grips|=1u<<n;
+      if (!observeKit) continue;
+      XrSpaceLocation location{XR_TYPE_SPACE_LOCATION};
+      if(!s.kitSpaces[n] || XR_FAILED(i.LocateSpace(s.kitSpaces[n],s.localSpace,s.predictedTime,&location)) ||
+         !(location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT)) continue;
+      kitController[n]=pose(location.pose);
+      palms[n]=kitController[n].p;
+      if (location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT)
+        trackedGrips |= 1u << n;
+      if (hasFloat && f.currentState >= .55f) gripTime[n] = f.lastChangeTime;
+      if (hasClick && b.currentState && (!gripTime[n] || b.lastChangeTime < gripTime[n]))
+        gripTime[n] = b.lastChangeTime;
+      if (triggers & (1u << n)) triggerTime[n] = trigger.lastChangeTime;
+      if(hasFloat || hasClick || hasTrigger) valid|=1u<<n;
+    }
+  }
+  RouteKit(s,g,sample,observeKit,sampleKit,XR_SUCCEEDED(r));
 #ifdef LOCKPICK_TEST_INPUT
   if (XR_SUCCEEDED(r)) {
     for (int n = 0; n < 2; n++) {
@@ -945,7 +967,7 @@ XrResult XRAPI_CALL Poll(XrInstance h, XrEventDataBuffer *event) {
 }
 bool Input(Session &s, XrTime time, Control &out, Scene &scene,
            const GameState &g) {
-  auto &i = *s.api;
+  Pose controller[2];
   if (!s.attached)
     return false;
   XrSpaceLocation hands[2] = {{XR_TYPE_SPACE_LOCATION},
@@ -954,6 +976,18 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
   auto actionsStart = std::chrono::steady_clock::now();
   unsigned activeMask = 0, aimMask = 0;
   for (int n = 0; n < 2; n++) {
+    if (s.hostFrame) {
+      const auto &grip = s.hostFrame->hands[n].grip;
+      if (!grip.usable() || !grip.tracked) return false;
+      controller[n] = grip.pose();
+      triggers[n] = s.hostFrame->trigger[n];
+      squeezes[n] = s.hostFrame->squeeze[n];
+      holds[n] = std::max(triggers[n], squeezes[n]);
+      activeMask |= 5u << n;
+      if (s.hostFrame->hands[n].aim.usable()) aimMask |= 1u << n;
+      continue;
+    }
+    auto &i = *s.api;
     XrActionStateGetInfo get{XR_TYPE_ACTION_STATE_GET_INFO};
     get.action = i.grip;
     get.subactionPath = i.hands[n];
@@ -972,6 +1006,7 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
              XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT |
              XR_SPACE_LOCATION_POSITION_TRACKED_BIT))
       return false;
+    controller[n] = pose(hands[n].pose);
     get.action = i.aim;
     XrSpaceLocation aim{XR_TYPE_SPACE_LOCATION};
     constexpr auto orientation = XR_SPACE_LOCATION_ORIENTATION_VALID_BIT |
@@ -1004,7 +1039,7 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
   auto actionsEnd = std::chrono::steady_clock::now();
   if (s.interaction.config.nativeScene)
     s.actionsMs += std::chrono::duration<double, std::milli>(actionsEnd - actionsStart).count();
-  Pose left = pose(hands[0].pose), right = pose(hands[1].pose);
+  Pose left = controller[0], right = controller[1];
 #ifdef LOCKPICK_TEST_INPUT
   // Developer build only. Positions are relative to the displayed lock.
   if (auto *file =
@@ -1236,19 +1271,10 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
       input.screwdriverHand, input.pickHand, held, insertedHands,
       input.preparedHands, input.housingHands);
   for (int hand = 0; hand < 2; hand++) {
-    XrHapticActionInfo hi{XR_TYPE_HAPTIC_ACTION_INFO};
-    hi.action = i.haptic;
-    hi.subactionPath = i.hands[hand];
-    if (feedback.stop & (1u << hand))
-      i.StopHapticFeedback(s.handle, &hi);
-    auto pulse = feedback.pulses[hand];
+    if (feedback.stop & (1u << hand)) SendFeedback(s,hand,false,nullptr);
+    const auto &pulse = feedback.pulses[hand];
     if (pulse.cue != Cue::None) {
-      XrHapticVibration vibration{XR_TYPE_HAPTIC_VIBRATION};
-      vibration.duration = XrDuration(pulse.durationMs) * 1000000;
-      vibration.frequency = XR_FREQUENCY_UNSPECIFIED;
-      vibration.amplitude = pulse.amplitude;
-      auto result = i.ApplyHapticFeedback(
-          s.handle, &hi, reinterpret_cast<XrHapticBaseHeader *>(&vibration));
+      auto result = SendFeedback(s,hand,false,&pulse);
       Log("haptic cue=%s hand=%d amplitude=%.3f duration_ms=%u condition=%.3f "
           "pressure=%.3f interval_ms=%u target=%.2f cylinder=%.2f result=%d",
           cueName(pulse.cue), hand, pulse.amplitude, pulse.durationMs,
@@ -1470,6 +1496,7 @@ void UpdateMenu(Session &s, const GameState &g) {
       fclose(file);
       s.interaction.config.load(std::string(text, count));
     }
+    if (s.backend) s.interaction.config.nativeScene = true;
     s.interaction.reset(g.pick);
     // The live wheel binding does not choose the close-up's tool source.
     if (g.menu && !s.interaction.config.useHolders && g.kitSlot &&
@@ -1503,13 +1530,19 @@ void UpdateMenu(Session &s, const GameState &g) {
 }
 bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
                   Control &out) {
-  auto &i = *s.api;
-  XrSpaceLocation head{XR_TYPE_SPACE_LOCATION};
-  if (XR_FAILED(i.LocateSpace(s.viewSpace, s.localSpace, time, &head)) ||
-      (head.locationFlags & (XR_SPACE_LOCATION_ORIENTATION_VALID_BIT |
-                             XR_SPACE_LOCATION_POSITION_VALID_BIT)) !=
-          (XR_SPACE_LOCATION_ORIENTATION_VALID_BIT |
-           XR_SPACE_LOCATION_POSITION_VALID_BIT)) {
+  Pose headPose;
+  bool headValid;
+  if (s.hostFrame) {
+    headValid = s.hostFrame->head.usable();
+    headPose = s.hostFrame->head.pose();
+  } else {
+    XrSpaceLocation head{XR_TYPE_SPACE_LOCATION};
+    constexpr auto valid = XR_SPACE_LOCATION_ORIENTATION_VALID_BIT | XR_SPACE_LOCATION_POSITION_VALID_BIT;
+    headValid = XR_SUCCEEDED(s.api->LocateSpace(s.viewSpace,s.localSpace,time,&head)) &&
+                (head.locationFlags & valid) == valid;
+    headPose = pose(head.pose);
+  }
+  if (!headValid) {
     s.interaction.reset(g.pick);
     s.presenting = false;
     StopFeedback(s);
@@ -1519,7 +1552,7 @@ bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
   if (!s.positioned) {
     auto &config = s.interaction.config;
     s.lock =
-        placeLock(pose(head.pose), config.lockDistance, config.lockBelowEyes);
+        placeLock(headPose, config.lockDistance, config.lockBelowEyes);
     Log("lock_placement distance=%.3f below_eyes=%.3f driver=lever "
         "holders=%d preparation=%d position=%.3f,%.3f,%.3f upright=1",
         config.lockDistance, config.lockBelowEyes,
@@ -1589,7 +1622,7 @@ bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
 void NativeInputFrame(Session &s) {
   auto g = Snapshot();
   if (!g.menu || !s.focused || !NativeReady() || s.bypassMenu == g.menu ||
-      s.failed || !s.localSpace || !s.viewSpace || !s.predictedTime ||
+      s.failed || (!s.backend && (!s.localSpace || !s.viewSpace)) || !s.predictedTime ||
       !ReadyRenderer(s)) {
     NativeSceneStop();
     NativeSceneTick(g);
@@ -2070,6 +2103,58 @@ XrResult XRAPI_CALL Create(const XrInstanceCreateInfo *c,
   return r;
 }
 } // namespace
+bool HostMenuPresented(uintptr_t menu) {
+  return menu && !layerOwners.load() && hostPresented.load() == menu && NativeScenePresented(menu);
+}
+void ProcessHostInput(void *backend, HostPulse pulse, HostFrame &frame, bool valid, bool openVR) {
+  if (layerOwners.load()) return;
+  // TTWVR polls on its startup thread and later hands polling to the game thread.
+  static std::mutex pollMutex;
+  std::lock_guard guard(pollMutex);
+  static Session s;
+  if (s.backend != backend) {
+    s = Session{};
+    s.backend = backend;
+    s.hostPulse = pulse;
+    s.attached = true;
+    hostPresented = 0;
+    Log("host_input_active backend=%s", openVR ? "OpenVR" : "OpenXR");
+  }
+  ++s.frames;
+  s.focused = valid && frame.valid && frame.head.usable();
+  s.hostFrame = &frame;
+  auto g = Snapshot();
+  UpdateMenu(s,g);
+  s.predictedTime = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::steady_clock::now().time_since_epoch()).count();
+  if (s.focused && frame.eyes[1].pose.usable())
+    NativeSceneCalibration(frame.eyes[1].pose.pose());
+  const bool observe = s.focused && !g.menu && g.kitSlot;
+  const bool sampling = observe || (s.focused && s.kitWeapons.awaitingRelease());
+  KitSample kit{};
+  if (sampling) for (int h=0; h<2; ++h) {
+    const unsigned bit = 1u << h;
+    const auto &grip = frame.hands[h].grip;
+    if (!grip.usable() || !grip.tracked) continue;
+    kit.triggerActive |= bit;
+    kit.gripActive |= bit;
+    if (frame.trigger[h] >= .65f) { kit.triggers |= bit; kit.triggerTime[h] = s.predictedTime; }
+    if (frame.squeeze[h] >= .55f) { kit.grips |= bit; kit.gripTime[h] = s.predictedTime; }
+    if (!observe) continue;
+    kit.kitController[h] = grip.pose();
+    kit.palms[h] = grip.position;
+    kit.valid |= bit;
+    kit.trackedGrips |= bit;
+  }
+  RouteKit(s,g,kit,observe,sampling,s.focused);
+  if (g.menu || s.presenting) NativeInputFrame(s);
+  hostPresented = s.presenting ? g.menu : 0;
+  if (s.focused) for (int h=0; h<2; ++h) {
+    if (s.presenting || (s.kitWeapons.gripMask & (1u<<h))) frame.squeeze[h] = 0;
+    if (s.presenting || (s.kitWeapons.triggerMask & (1u<<h))) frame.trigger[h] = 0;
+  }
+  s.hostFrame = nullptr;
+}
 } // namespace locks
 extern "C" __declspec(dllexport) XrResult XRAPI_CALL
 xrNegotiateLoaderApiLayerInterface(const XrNegotiateLoaderInfo *l, const char *,

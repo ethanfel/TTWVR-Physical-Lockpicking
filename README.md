@@ -2,14 +2,19 @@
 
 Pick a door, safe or ammo box with both hands in VR. Draw the bobby pin and screwdriver from one holster, bend the pin, then feel the lock resist as you push the screwdriver sideways.
 
-**[Download Beta 0.1](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.1/TTWVR-Physical-Lockpicking-Beta-0.1.zip)**
+**[Download the ready-to-play Beta 0.1 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.1-r2/TTWVR-Physical-Lockpicking-Beta-0.1-Ready-to-Play.zip)**
 
-| Install on | Follow this guide |
-| --- | --- |
-| Windows with Mod Organizer 2 | [Windows installation](docs/install-windows.md) |
-| Linux with Proton and Fluorine | [Linux installation](docs/install-linux.md) |
+## Install
 
-Start with **Tale of Two Wastelands already running in VR** on **Tale of Two Realities 1.1.6 or 1.1.7**. The ZIP contains the compiled addon. A one-time Python setup prepares the meshes and textures from your own game files. Native Windows headset play is unverified.
+Start with **Tale of Two Realities (TTWVR) 1.1.6 or 1.1.7** already working with Tale of Two Wastelands.
+
+1. Install the ZIP as a mod in **Mod Organizer 2** on Windows or **Fluorine** on Linux.
+2. Enable the mod and **TTWVRLockKit.esp** in your VR profile.
+3. Launch TTWVR as usual.
+
+For a manual installation, back up any matching files in `Fallout New Vegas/Data`, then copy the ZIP contents directly into that folder and enable the ESP. `TTWVRLockKit.esp` should sit alongside `FalloutNV.esm`.
+
+The addon takes controller input and haptics from the backend TTWVR selects, including OpenVR and OpenXR. The same ZIP works with stock textures and optional texture packs such as NMC. Install the same ZIP on Windows or Linux. Python, asset conversion, OpenXR registration and extra launch options are unnecessary.
 
 ## Your first lock
 

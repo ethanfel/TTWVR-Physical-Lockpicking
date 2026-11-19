@@ -2,24 +2,21 @@
 
 | What you see | What to check |
 | --- | --- |
-| “Unsupported TTWVR.dll” | Select the VR profile with the original 1.1.6 or 1.1.7 DLL enabled. Check which mod wins the `NVSE/Plugins/TTWVR.dll` conflict. |
-| “Output already exists” | For another install, prepare into a fresh mod folder and then switch the enabled copy. [Manual setup](advanced.md#prepare-into-a-different-folder) |
-| The game starts with ordinary lockpicking | Check the addon and `TTWVRLockKit.esp` in the active profile. Confirm the registry file points to the **managed game directory**. Under Proton, import it in the game's prefix. |
+| The game starts with ordinary lockpicking | Confirm the mod and `TTWVRLockKit.esp` are enabled and that TTWVR is 1.1.6 or 1.1.7. For a manual install, check that the ESP is directly in `Data`. |
 | I can’t assign the pin | Open the **large floating Pip-Boy**, highlight a bobby pin under **Items → Misc**, hold Hotkey, select a wheel direction, then release. |
 | A particular object has no usable world lock | Stow the tools and activate it for the close-up interaction. Live placement covers 101 model paths, including standard safes, ammo boxes, toolboxes and many doors. Replacement meshes can move the latch. |
-
-The addon uses OpenXR for hand tracking and haptics. Registering its layer adds it to the game's existing OpenXR setup. Keep the runtime you already use to play TTWVR.
 
 ## Check the log
 
 Look for `TTWVRPhysicalLockpicking.log` under `NVSE/Plugins` in the installed addon or your manager's **Overwrite** folder. Check the entries from your latest launch.
 
 - `plugin_loaded` with `release="Beta 0.1"` identifies the running addon.
-- `plugin_bypass disabled=1` means the launch environment disabled the addon. On Windows, exit MO2 completely and reopen it using `Play-TTWVR.cmd`. On Proton, check that your wrapper passes `TTWVR_PHYSICAL_LOCKPICKING=1` to the game.
-- `live_mount_surfaces loaded=1 kinds=101` confirms the live lock placement data loaded. `session_created d3d11=1 spaces=1` shows the addon's OpenXR layer reached the VR session.
+- `host_input_active backend=OpenVR` or `host_input_active backend=OpenXR` identifies the backend selected by TTWVR. The addon uses the same one.
+- `live_mount_surfaces loaded=1 kinds=101` confirms the live lock placements loaded.
+- `plugin_bypass disabled=1` means an environment override disabled the addon. Clear `DISABLE_TTWVR_PHYSICAL_LOCKPICKING` and any `TTWVR_PHYSICAL_LOCKPICKING=0` setting.
 
 ## Remove the addon
 
-Close Fallout. Disable the mod and `TTWVRLockKit.esp`. Import **unregister-ttwvr-lockpicking.reg** in the same registry used at install. On Linux, remove the added Steam launch variable. On Windows, start MO2 with your usual shortcut.
+Close Fallout and disable the mod and `TTWVRLockKit.esp` in the profile. For a manual install, remove the files listed in the ZIP and restore any files backed up before installation. Its optional shader cache in `Data/LPVR` (or your manager’s Overwrite folder) can also be removed.
 
 [Windows install](install-windows.md) · [Linux install](install-linux.md)

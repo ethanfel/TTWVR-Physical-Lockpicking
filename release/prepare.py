@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parent
 SOURCE = ROOT / "source"
 TOOLS = SOURCE / "tools"
 SUPPORTED = {
+    "503266c4f4c2350b357c8c15021d8bde28973254745d9302b8e3cfde66489a27": "1.1.6",
+    "119a085a5b0101f0618b8e076a421b4b89e30d72d9b6eae874f4e5af7bd3fb27": "1.1.7",
     "63712922499b2155a3d2c6f54abbdfc1eaf95d08712b937c6276d6a8ae0d774d": "1.1.6",
     "ae7dc0d7ba94651af0ccd729122f623d3dbdf0b85c6c787838c04bbc721135d6": "1.1.7",
 }
@@ -139,7 +141,7 @@ def main():
         share_identical_images(assets, "*.rgba")
         share_identical_images(mod / "textures/TTWVRPhysicalLockpicking", "*.dds")
         mod.rename(output)
-    print(f"Beta 0.1 prepared in {output}. Enable this mod and TTWVRLockKit.esp, then register its OpenXR layer as described in README.md.")
+    print(f"Beta 0.1 prepared in {output}. Enable this mod and TTWVRLockKit.esp and launch TTWVR as usual.")
 
 
 if __name__ == "__main__":
