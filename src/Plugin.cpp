@@ -329,7 +329,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 76;  // Beta 0.1, following internal development builds 1–75.
+  p->version = 77;  // Beta 0.1, revision 3.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -342,11 +342,11 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=76 release=\"Beta 0.1\" build=host-input", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=77 release=\"Beta 0.1\" build=linked-door-locks", n->runtime);
   InitMotionShaders();
   InitInventory(n->query(6));
   InitKit(n->query(6));
-  InitWorldLocks(n->query(6), n->query(5));
+  InitWorldLocks(n->query(6), n->query(5), n->query(3));
   InitNativeScene(n->query(6));
   auto *m = static_cast<Messaging *>(n->query(2));
   return m && m->listen(n->handle(), "NVSE", OnMessage);

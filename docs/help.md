@@ -6,6 +6,8 @@
 | I can’t assign the pin | Open the **large floating Pip-Boy**, highlight a bobby pin under **Items → Misc**, hold Hotkey, select a wheel direction, then release. |
 | A particular object has no usable world lock | Stow the tools and activate it for the close-up interaction. Live placement covers 101 model paths, including standard safes, ammo boxes, toolboxes and many doors. Replacement meshes can move the latch. |
 
+On supported doors and containers, the physical lock stays visible even when your Lockpick skill is too low. It disappears when the object is unlocked, including when the other side of a door is unlocked.
+
 ## Check the log
 
 Look for `TTWVRPhysicalLockpicking.log` under `NVSE/Plugins` in the installed addon or your manager's **Overwrite** folder. Check the entries from your latest launch.

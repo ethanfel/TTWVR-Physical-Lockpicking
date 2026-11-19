@@ -26,6 +26,24 @@ struct Scripts {
   void *(__cdecl *compile)(const char *);
 };
 Scripts *api = nullptr;
+// Public xNVSE command table ABI. GetLocked's condition handler can be called
+// directly on a reference, including during controller updates.
+using Condition = bool(__cdecl *)(void *, void *, void *, double *);
+struct ConditionCommand {
+  const char *name, *alias;
+  unsigned opcode;
+  const char *help;
+  uint16_t needsParent, paramCount;
+  void *params, *execute, *parse;
+  Condition eval;
+};
+struct CommandTable {
+  unsigned version;
+  void *start, *end, *byOpcode;
+  const ConditionCommand *(__cdecl *byName)(const char *);
+};
+static_assert(offsetof(ConditionCommand, eval) == 0x20);
+CommandTable *commands = nullptr;
 // Prefix of the xNVSE array interface, through GetElements.
 struct Arrays {
   void *create, *createStringMap, *createMap, *assign, *set, *append;
@@ -330,17 +348,16 @@ void clear(bool unloading) {
     attach(active, 2);
   active = {};
 }
-unsigned formFlags(Ptr ref) { return read<unsigned>(ref + 8); }
 bool locked(Ptr ref) {
-  if (!ref || formFlags(ref) & (0x20u | 0x800u))
-    return false;
-  for (Ptr e = read<Ptr>(ref + 0x48), n = 0; e && n < 128;
-       e = read<Ptr>(e + 8), ++n)
-    if (read<unsigned char>(e + 4) == 0x2a) {
-      auto data = read<Ptr>(e + 0xc);
-      return data && (read<unsigned char>(data + 8) & 1);
-    }
-  return false;
+  if (!ref || (read<unsigned>(ref + 8) & (0x20u | 0x800u))) return false;
+  // Load doors can store their lock on the other end of the transition.
+  // Resolve the game's own condition once, after all plugins have loaded.
+  static const ConditionCommand *getLocked =
+      commands && commands->byName ? commands->byName("GetLocked") : nullptr;
+  double result = 0;
+  return getLocked && getLocked->eval &&
+         getLocked->eval(reinterpret_cast<void *>(ref), nullptr, nullptr, &result) &&
+         result > 0;
 }
 Selection nearest(Ptr cell, const LiveTool *wire, const LiveTool *driver,
                   Vec eye) {
@@ -448,7 +465,8 @@ end)");
   Log("live_witness_support enabled=%d", findWitness != nullptr);
 }
 } // namespace
-void InitWorldLocks(void *scripts, void *arrayInterface) {
+void InitWorldLocks(void *scripts, void *arrayInterface, void *commandTable) {
+  commands = static_cast<CommandTable *>(commandTable);
   arrays = static_cast<Arrays *>(arrayInterface);
   if (auto ini=_wfopen((folder+L"\\TTWVRPhysicalLockpicking.ini").c_str(),L"rb")) {
     char data[8192]; auto count=fread(data,1,sizeof(data),ini); fclose(ini);

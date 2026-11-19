@@ -2,7 +2,7 @@
 
 Pick a door, safe or ammo box with both hands in VR. Draw the bobby pin and screwdriver from one holster, bend the pin, then feel the lock resist as you push the screwdriver sideways.
 
-**[Download the ready-to-play Beta 0.1 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.1-r2/TTWVR-Physical-Lockpicking-Beta-0.1-Ready-to-Play.zip)**
+**[Download the ready-to-play Beta 0.1 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/latest/download/TTWVR-Physical-Lockpicking-Beta-0.1-Ready-to-Play.zip)**
 
 ## Install
 
