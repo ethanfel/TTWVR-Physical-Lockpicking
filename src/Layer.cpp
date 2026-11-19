@@ -260,6 +260,7 @@ bool CreateInputs(Instance &i) {
 }
 XrResult SendFeedback(Session &s, int hand, bool kit, const Pulse *pulse) {
   if (s.backend) {
+    if (!s.hostPulse) return XR_ERROR_FUNCTION_UNSUPPORTED;
     // The host accepts seconds. OpenVR pulses expire on their own.
     if (pulse) s.hostPulse(s.backend, hand != 0, pulse->amplitude, pulse->durationMs * .001f);
     else s.hostPulse(s.backend, hand != 0, 0.f, .001f);

@@ -14,7 +14,7 @@ cmake --build build-tests
 ctest --test-dir build-tests --output-on-failure
 ~~~
 
-To test OpenVR without starting Fallout, build the optional MinGW target `lock_host_openvr_test` and run its EXE under Wine or Windows with arguments `117 "path/to/TTWVR.dll"` (use `116` for 1.1.6). It drives the original backend with simulated controller and compositor responses.
+To test OpenVR without starting Fallout, build the optional MinGW target `lock_host_openvr_test` and run its EXE under Wine or Windows with arguments `117 "path/to/TTWVR.dll"` (use `116` for 1.1.6). It drives the original backend with simulated controller and compositor responses. Add a third argument to exercise other controller setups. Use `direct` for resolved methods, `wrapped` when both backends already have a controller handler, or `mixed` when only OpenXR has one.
 
 ## Build the player archive
 

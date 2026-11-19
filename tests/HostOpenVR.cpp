@@ -10,6 +10,15 @@
 
 namespace {
 unsigned polls = 0, pulses = 0;
+using Poll = bool (__thiscall *)(void*, locks::HostFrame*);
+static Poll earlier[2]{};
+unsigned forwarded = 0;
+template<unsigned index>
+bool __fastcall forwardPoll(void *self, void *, locks::HostFrame *frame) {
+  ++forwarded;
+  return earlier[index](self, frame);
+}
+
 struct Matrix { float m[3][4]; };
 struct DevicePose {
   Matrix pose;
@@ -73,7 +82,11 @@ void ProcessHostInput(void *backend,HostPulse pulse,HostFrame &frame,bool valid,
 }
 int wmain(int argc,wchar_t **argv) {
   using namespace locks;
-  if (argc!=3 || (wcscmp(argv[1],L"116") && wcscmp(argv[1],L"117"))) return 2;
+  if ((argc != 3 && argc != 4) || (wcscmp(argv[1],L"116") && wcscmp(argv[1],L"117"))) return 2;
+  const bool direct = argc == 4 && wcscmp(argv[3], L"direct") == 0;
+  const bool wrapped = argc == 4 && wcscmp(argv[3], L"wrapped") == 0;
+  const bool mixed = argc == 4 && wcscmp(argv[3], L"mixed") == 0;
+  if (argc == 4 && !direct && !wrapped && !mixed) return 2;
   bool newer=wcscmp(argv[1],L"117")==0;
   HMODULE host=LoadLibraryW(argv[2]);
   if (!host) { std::printf("LoadLibrary failed %lu\n",GetLastError()); return 3; }
@@ -85,14 +98,52 @@ int wmain(int argc,wchar_t **argv) {
   const auto base=reinterpret_cast<uintptr_t>(host);
   auto **table=reinterpret_cast<void **>(base+(newer ? 0xaf36d0 : 0xad7e40));
   backend[0]=table; backend[7]=&system; backend[8]=&compositor;
-  InstallHostInput(base,newer);
-  using Poll=bool (__thiscall *)(void*,HostFrame*);
+  auto **xrTable = reinterpret_cast<void **>(base + (newer ? 0xaf3568 : 0xad7cd8));
+  if (direct) {
+    for (auto **methods : {table, xrTable}) {
+      DWORD old = 0, ignored = 0;
+      assert(VirtualProtect(methods, 29*sizeof(void *), PAGE_READWRITE, &old));
+      for (unsigned slot : {6u, 28u}) {
+        auto *entry = static_cast<unsigned char *>(methods[slot]);
+        assert(entry[0] == 0xe9);
+        int32_t displacement;
+        std::memcpy(&displacement, entry + 1, sizeof(displacement));
+        methods[slot] = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(entry) + 5 + displacement);
+      }
+      assert(VirtualProtect(methods, 29*sizeof(void *), old, &ignored));
+    }
+  }
+  if (wrapped || mixed) {
+    unsigned i = 0;
+    for (auto **methods : {table, xrTable}) {
+      if (mixed && i == 0) { ++i; continue; }
+      DWORD old = 0, ignored = 0;
+      assert(VirtualProtect(methods + 6, sizeof(void *), PAGE_READWRITE, &old));
+      earlier[i] = reinterpret_cast<Poll>(methods[6]);
+      methods[6] = i == 0 ? reinterpret_cast<void *>(forwardPoll<0>) :
+                            reinterpret_cast<void *>(forwardPoll<1>);
+      assert(VirtualProtect(methods + 6, sizeof(void *), old, &ignored));
+      ++i;
+    }
+  }
+  auto *xrOriginal = xrTable[6];
+  assert(InstallHostInput(base,newer));
+  assert(InstallHostInput(base,newer));  // Retrying must not deliver a frame twice.
+  assert((xrTable[6] == xrOriginal) == (wrapped || mixed));
   auto poll=reinterpret_cast<Poll>(table[6]);
+  if (wrapped || mixed) {
+    if (wrapped) assert(table[6] == reinterpret_cast<void *>(forwardPoll<0>));
+    auto *call = reinterpret_cast<unsigned char *>(base + (newer ? 0x6fb69b : 0x6e43fb));
+    assert(call[0] == 0xe8);
+    int32_t displacement;
+    std::memcpy(&displacement, call + 1, sizeof(displacement));
+    poll = reinterpret_cast<Poll>(reinterpret_cast<uintptr_t>(call) + 5 + displacement);
+  }
   for(int n=0;n<3;++n) {
     HostFrame frame{};
     if (!poll(backend,&frame) || frame.trigger[0]!=0) return 4;
   }
-  if (polls!=3 || pulses!=3) return 5;
+  if (polls!=3 || pulses!=3 || forwarded!=(wrapped ? 3u : 0u)) return 5;
   std::puts("PASS real TTWVR OpenVR backend: stereo poses, both hands, analog inputs, filtering and haptic dispatch");
   return 0;
 }
