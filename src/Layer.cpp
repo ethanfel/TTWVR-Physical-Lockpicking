@@ -1039,6 +1039,14 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
   auto actionsEnd = std::chrono::steady_clock::now();
   if (s.interaction.config.nativeScene)
     s.actionsMs += std::chrono::duration<double, std::milli>(actionsEnd - actionsStart).count();
+  if (s.hostFrame && s.frames % 180 == 0) {
+    const auto &leftHand = s.hostFrame->hands[0];
+    const auto &rightHand = s.hostFrame->hands[1];
+    Log("closeup_grip left_q=%.4f,%.4f,%.4f,%.4f right_q=%.4f,%.4f,%.4f,%.4f aim_w=%.4f,%.4f",
+        controller[0].q.x,controller[0].q.y,controller[0].q.z,controller[0].q.w,
+        controller[1].q.x,controller[1].q.y,controller[1].q.z,controller[1].q.w,
+        leftHand.aim.orientation.w,rightHand.aim.orientation.w);
+  }
   Pose left = controller[0], right = controller[1];
 #ifdef LOCKPICK_TEST_INPUT
   // Developer build only. Positions are relative to the displayed lock.
@@ -1674,6 +1682,38 @@ XrResult XRAPI_CALL WaitFrame(XrSession h, const XrFrameWaitInfo *info,
     s.predictedTime = state->predictedDisplayTime;
   return r;
 }
+// TTWVR submits the stock lock screen separately from the stereo scene.
+// Keep the original submission if it is the only picture (loading or fallback).
+struct PhysicalMenuLayers {
+  std::vector<const XrCompositionLayerBaseHeader *> kept;
+  XrFrameEndInfo info;
+  explicit PhysicalMenuLayers(const XrFrameEndInfo &frame) : info(frame) {
+    bool stereo = false;
+    for (uint32_t n = 0; n < frame.layerCount; ++n) {
+      const auto *layer = frame.layers[n];
+      if (layer->type == XR_TYPE_COMPOSITION_LAYER_PROJECTION &&
+          reinterpret_cast<const XrCompositionLayerProjection *>(layer)->viewCount == 2)
+        stereo = true;
+      if (layer->type != XR_TYPE_COMPOSITION_LAYER_QUAD) kept.push_back(layer);
+    }
+    if (stereo && kept.size() != frame.layerCount) {
+      info.layers = kept.data();
+      info.layerCount = static_cast<uint32_t>(kept.size());
+    }
+  }
+};
+PFN_xrEndFrame hostEndFrame = nullptr;
+XrResult XRAPI_CALL SubmitHostFrame(XrSession session, const XrFrameEndInfo *frame) {
+  const auto menu = hostPresented.load();
+  if (!frame || !HostMenuPresented(menu)) return hostEndFrame(session, frame);
+  PhysicalMenuLayers physical(*frame);
+  const auto result = hostEndFrame(session, &physical.info);
+  static unsigned samples = 0;
+  if ((samples++ % 180) == 0)
+    Log("host_lock_submission menu=%08x incoming=%u submitted=%u result=%d",
+        unsigned(menu), frame->layerCount, physical.info.layerCount, int(result));
+  return result;
+}
 XrResult XRAPI_CALL EndFrame(XrSession h, const XrFrameEndInfo *c) {
   auto it = sessions.find(h);
   if (it == sessions.end())
@@ -1731,18 +1771,11 @@ XrResult XRAPI_CALL EndFrame(XrSession h, const XrFrameEndInfo *c) {
       if (NativeScenePresented(g.menu) && s.bypassMenu != g.menu) {
         // TTWVR presents the original lock UI in a quad. Replace that menu
         // presentation only; retain the world projections and runtime images.
-        std::vector<const XrCompositionLayerBaseHeader *> layers;
-        for (unsigned n = 0; n < c->layerCount; n++)
-          if (c->layers[n]->type != XR_TYPE_COMPOSITION_LAYER_QUAD)
-            layers.push_back(c->layers[n]);
-        auto copy = *c;
-        copy.layers = layers.data();
-        copy.layerCount = layers.size();
+        PhysicalMenuLayers physical(*c);
         if (s.frames % 180 == 0)
-          Log("native_scene_submission game_layers=%u submitted_layers=%u "
-              "overlay_added=0",
-              c->layerCount, copy.layerCount);
-        return SubmitGame(s, &copy);
+          Log("native_scene_submission game_layers=%u submitted_layers=%u overlay_added=0",
+              c->layerCount, physical.info.layerCount);
+        return SubmitGame(s, &physical.info);
       }
       return SubmitGame(s, c);
     }
@@ -2103,6 +2136,15 @@ XrResult XRAPI_CALL Create(const XrInstanceCreateInfo *c,
   return r;
 }
 } // namespace
+void InstallHostXrSubmission(uintptr_t image, bool version117) {
+  // The supported TTWVR builds call their loader here after composing all layers.
+  // This route needs neither an API layer registration nor a runtime change.
+  const uintptr_t original = image + (version117 ? 0x21e5e : 0x21bd9);
+  hostEndFrame = reinterpret_cast<PFN_xrEndFrame>(original);
+  const NativeCall call{image + (version117 ? 0x6dbf94 : 0x6c4d34), original,
+                        reinterpret_cast<void *>(SubmitHostFrame)};
+  Log("host_xr_lock_submission installed=%d", InstallVerifiedCalls(&call, 1));
+}
 bool HostMenuPresented(uintptr_t menu) {
   return menu && !layerOwners.load() && hostPresented.load() == menu && NativeScenePresented(menu);
 }

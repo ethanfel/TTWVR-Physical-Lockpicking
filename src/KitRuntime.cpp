@@ -174,6 +174,7 @@ bool init() {
     return false;
   }
   InstallHostInput(uintptr_t(m), version117);
+  InstallHostXrSubmission(uintptr_t(m), version117);
   host = uintptr_t(m) - 0x10000000;
   slotQuery = api->compile("begin Function {}\nSetFunctionValue (Call "
                            "(CompileScript \"TTWVRLockKit/Slot.txt\"))\nend");
