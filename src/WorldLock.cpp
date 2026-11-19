@@ -5,6 +5,8 @@
 #include "TargetProfiles.h"
 #include <cstdio>
 #include <cstring>
+#include <map>
+#include <vector>
 namespace locks {
 namespace {
 using Ptr = uintptr_t;
@@ -24,7 +26,16 @@ struct Scripts {
   void *(__cdecl *compile)(const char *);
 };
 Scripts *api = nullptr;
-void *action = nullptr, *attachments[2][targetKinds]{};
+// Prefix of the xNVSE array interface, through GetElements.
+struct Arrays {
+  void *create, *createStringMap, *createMap, *assign, *set, *append;
+  unsigned (__cdecl *size)(void *);
+  void *lookup, *get;
+  bool (__cdecl *elements)(void *, Element *, Element *);
+};
+Arrays *arrays = nullptr;
+void *nearbyQuery = nullptr;
+void *action = nullptr, *attachments[4][targetKinds]{};
 struct DriverFrame {
   Mat r;
   Vec tip;
@@ -47,8 +58,16 @@ struct Selection {
   bool attached = false;
   int level = 0;
   ULONGLONG mountDeadline = 0;
+  Ptr playerCell = 0;
 };
 Selection active;
+struct VisibleLock {
+  Selection target;
+  bool nearby = false;
+};
+std::map<unsigned, VisibleLock> visible;
+ULONGLONG nextVisibility = 0;
+Ptr previousCloseup = 0;
 MountedInteraction model;
 LockRules rules;
 LiveLockPuzzle puzzle;
@@ -205,8 +224,8 @@ int call(void *code, Ptr ref, unsigned mode) {
     return -1;
   return int(out.data.number);
 }
-int attach(const Selection &s, bool add) {
-  auto &code = attachments[add][s.kind - 1];
+int attach(const Selection &s, unsigned flags) {
+  auto &code = attachments[flags][s.kind - 1];
   if (!code) {
     char txt[256];
     snprintf(txt, sizeof(txt),
@@ -215,7 +234,7 @@ int attach(const Selection &s, bool add) {
              "let resultCode := AttachModel lockRef %d "
              "\"TTWVRPhysicalLockpicking\\world-lock-%u."
              "nif\"\nSetFunctionValue resultCode\nend",
-             add ? 3 : 2, s.kind);
+             int(flags), s.kind);
     code = api->compile(txt);
   }
   return call(code, s.ref, 0);
@@ -308,7 +327,7 @@ void clear(bool unloading) {
                        read<unsigned>(active.ref + 0xc) == active.id;
   releaseContact(sameRef);
   if (sameRef && active.attached)
-    attach(active, false);
+    attach(active, 2);
   active = {};
 }
 unsigned formFlags(Ptr ref) { return read<unsigned>(ref + 8); }
@@ -327,25 +346,24 @@ Selection nearest(Ptr cell, const LiveTool *wire, const LiveTool *driver,
                   Vec eye) {
   Selection best;
   float distance = 30; // world units, about a forearm's reach
-  for (Ptr node = cell + 0xac, n = 0; node && n < 8192;
-       node = read<Ptr>(node + 4), ++n) {
-    Ptr ref = read<Ptr>(node);
+  auto consider = [&](Ptr ref) {
     Vec pos = read<Vec>(ref + 0x30);
     if (!ref || ((!wire || length(pos - wire->tip) > 360) &&
                  (!driver || length(pos - driver->tip) > 360)))
-      continue;
+      return;
     Ptr base = read<Ptr>(ref + 0x20);
     auto type = read<unsigned char>(base + 4);
     if ((type != 0x1b && type != 0x1c) || !locked(ref))
-      continue;
+      return;
     GameState g;
     g.target = ref;
     UpdateTarget(g);
     if (!g.targetKind)
-      continue;
-    Selection t{ref, rootOf(ref), 0, cell, g.targetRefId, g.targetKind};
+      return;
+    Selection t{ref, rootOf(ref), 0, read<Ptr>(ref + 0x40), g.targetRefId, g.targetKind};
+    t.playerCell = cell;
     if (!t.root)
-      continue;
+      return;
     int rank = 0;
     bool checkedRank = false;
     for (unsigned j = 0; j <= mounts[t.kind - 1].reverse; ++j) {
@@ -383,6 +401,13 @@ Selection nearest(Ptr cell, const LiveTool *wire, const LiveTool *driver,
         best = t;
       }
     }
+  };
+  for (Ptr node = cell + 0xac, n = 0; node && n < 8192;
+       node = read<Ptr>(node + 4), ++n)
+    consider(read<Ptr>(node));
+  for (const auto &entry : visible) {
+    const auto &s = entry.second.target;
+    if (s.cell != cell && current(s)) consider(s.ref);
   }
   return best;
 }
@@ -423,7 +448,8 @@ end)");
   Log("live_witness_support enabled=%d", findWitness != nullptr);
 }
 } // namespace
-void InitWorldLocks(void *scripts) {
+void InitWorldLocks(void *scripts, void *arrayInterface) {
+  arrays = static_cast<Arrays *>(arrayInterface);
   if (auto ini=_wfopen((folder+L"\\TTWVRPhysicalLockpicking.ini").c_str(),L"rb")) {
     char data[8192]; auto count=fread(data,1,sizeof(data),ini); fclose(ini);
     settings.load(std::string(data,count));
@@ -467,11 +493,76 @@ void InitWorldLocks(void *scripts) {
   Log("live_mount_surfaces loaded=%d kinds=%u", panelsReady, targetKinds);
 
 }
+// Visible hardware has scene lifetime only. JIP flag 3 attaches it immediately;
+// flag 0 forgets its reload registration while leaving the current node in place.
+// A retained node lets us remove exactly our own hardware on unlock or cell unload.
+void TickVisibleLocks(Ptr closeupTarget) {
+  if (!ready || !arrays || !NativeReady()) return;
+  auto now = GetTickCount64();
+  if (now < nextVisibility && previousCloseup == closeupTarget) return;
+  nextVisibility = now + 500;
+  previousCloseup = closeupTarget;
+  if (!read<Ptr>(player() + 0x40)) return;
+  if (!nearbyQuery)
+    nearbyQuery = api->compile("int formType\nbegin Function {formType}\n"
+        "SetFunctionValue (player.GetRefs formType 1 1 900)\nend");
+  if (!nearbyQuery) return;
+
+  std::vector<Element> nearby;
+  for (unsigned type : {0x1bu, 0x1cu}) { // containers and doors, including adjacent exterior cells
+    Element result;
+    if (!api->call(nearbyQuery, nullptr, nullptr, &result, 1, type) ||
+        result.type != 4 || !result.data.form) return;
+    unsigned count = arrays->size(result.data.form);
+    if (count > 65535) return;
+    auto start = nearby.size();
+    nearby.resize(start + count);
+    if (count && !arrays->elements(result.data.form, nearby.data() + start, nullptr)) return;
+  }
+  for (auto &entry : visible) entry.second.nearby = false;
+  unsigned added = 0;
+  for (const auto &item : nearby) {
+    Ptr ref = Ptr(item.data.form);
+    if (item.type != 2 || !ref || ref == closeupTarget || ref == finishing || !locked(ref)) continue;
+    unsigned id = read<unsigned>(ref + 0xc);
+    Ptr root = rootOf(ref);
+    if (!root || !id) continue;
+    auto found = visible.find(id);
+    if (found != visible.end()) {
+      auto &old = found->second;
+      old.nearby = old.target.ref == ref && old.target.root == root &&
+                   read<Ptr>(old.target.hardware + 0x18) == root;
+      continue;
+    }
+    if (added >= 4 || ref == active.ref) continue;
+    GameState state;
+    state.target = ref;
+    UpdateTarget(state);
+    if (!state.targetKind) continue;
+    Selection s{ref,root,0,read<Ptr>(ref + 0x40),id,state.targetKind};
+    auto name = "TTWVRWorldLock_" + std::to_string(s.kind);
+    if (FindSceneNode(root, name) || attach(s, 3) <= 0) continue;
+    s.hardware = FindSceneNode(root, name);
+    attach(s, 0);
+    if (!s.hardware || read<Ptr>(s.hardware + 0x18) != root) continue;
+    RetainSceneNode(s.hardware);
+    visible.emplace(id, VisibleLock{s,true});
+    ++added;
+    Log("visible_lock_added ref=%08x kind=%u", id, s.kind);
+  }
+  for (auto it = visible.begin(); it != visible.end();) {
+    const auto &v = it->second;
+    if (v.nearby || (active.hardware && v.target.hardware == active.hardware)) { ++it; continue; }
+    ReleaseMountedChild(v.target.hardware);
+    Log("visible_lock_removed ref=%08x", it->first);
+    it = visible.erase(it);
+  }
+}
 uintptr_t WorldDriverMount() { return active.hardware; }
 bool HasParkedPin() { return parkedMesh != 0; }
 bool ParkLivePin(uintptr_t mesh) {
   if (!mesh || parkedMesh || !model.pin || !current(active) || !locked(active.ref) ||
-      read<Ptr>(player() + 0x40) != active.cell ||
+      read<Ptr>(player() + 0x40) != active.playerCell ||
       read<Ptr>(active.hardware + 0x18) != active.root ||
       !MountSceneChild(mesh, active.hardware)) return false;
   parkedMesh = mesh;
@@ -481,7 +572,7 @@ bool ParkLivePin(uintptr_t mesh) {
   return true;
 }
 bool ParkedPinPose(Transform &world) {
-  if (!parkedMesh || !current(active) || read<Ptr>(player() + 0x40) != active.cell ||
+  if (!parkedMesh || !current(active) || read<Ptr>(player() + 0x40) != active.playerCell ||
       read<Ptr>(parkedMesh + 0x18) != active.hardware ||
       read<Ptr>(active.hardware + 0x18) != active.root) return false;
   world = read<Transform>(parkedMesh + 0x68);
@@ -503,6 +594,10 @@ void ResetWorldLock(bool unloading) {
   nextWitnessCheck = 0;
   nextScan = 0;
   if (unloading) {
+    for (const auto &entry : visible) ReleaseMountedChild(entry.second.target.hardware);
+    visible.clear();
+    nextVisibility = 0;
+    previousCloseup = 0;
     puzzle = {};
     finishing = 0;
   }
@@ -543,7 +638,7 @@ bool WorldLockFrame(GameState &g, const LiveTool *wire, const Transform *hand,
   }
   bool crossedDoor = false;
   if (active.ref) {
-    if (!current(active) || cell != active.cell || !locked(active.ref) ||
+    if (!current(active) || cell != active.playerCell || !locked(active.ref) ||
         (active.hardware && read<Ptr>(active.hardware + 0x18) != active.root))
       clear(false);
     else {
@@ -581,7 +676,7 @@ bool WorldLockFrame(GameState &g, const LiveTool *wire, const Transform *hand,
         auto name = "TTWVRWorldLock_" + std::to_string(active.kind);
         active.hardware = FindSceneNode(active.root, name);
         if (!active.hardware) {
-          int result = attach(active, true);
+          int result = attach(active, 3);
           active.attached = result > 0;
           active.mountDeadline = now + 600;
           Log("live_lock_mount ref=%08x kind=%u registered=%d", active.id,

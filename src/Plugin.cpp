@@ -293,6 +293,7 @@ void __cdecl OnMessage(Message *m) {
   UpdateTarget(next);
   UpdateInventory(next);
   TickKit(next);
+  TickVisibleLocks(next.target);
   NativeSceneTick(next);
   std::lock_guard guard(sharedMutex);
   if (next.menu != game.menu || (next.stage != game.stage && next.stage >= 4))
@@ -338,13 +339,13 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=76 release=\"Beta 0.1\" build=pin-retry", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=76 release=\"Beta 0.1\" build=visible-locks", n->runtime);
   // The test installer registers an opt-in layer in this game prefix only.
   // Do not force an undiscoverable explicit layer: initialization must bypass
   // safely.
   InitInventory(n->query(6));
   InitKit(n->query(6));
-  InitWorldLocks(n->query(6));
+  InitWorldLocks(n->query(6), n->query(5));
   InitNativeScene(n->query(6));
   auto *m = static_cast<Messaging *>(n->query(2));
   return m && m->listen(n->handle(), "NVSE", OnMessage);

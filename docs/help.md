@@ -6,7 +6,9 @@
 | “Output already exists” | For another install, prepare into a fresh mod folder and then switch the enabled copy. [Manual setup](advanced.md#prepare-into-a-different-folder) |
 | The game starts with ordinary lockpicking | Check the addon and `TTWVRLockKit.esp` in the active profile. Confirm the registry file points to the **managed game directory**. Under Proton, import it in the game's prefix. |
 | I can’t assign the pin | Open the **large floating Pip-Boy**, highlight a bobby pin under **Items → Misc**, hold Hotkey, select a wheel direction, then release. |
-| A particular object has no usable world lock | Stow the tools and activate it for the close-up interaction. Live placement covers 101 model paths. Replacement meshes can move the latch. |
+| A particular object has no usable world lock | Stow the tools and activate it for the close-up interaction. Live placement covers 101 model paths, including standard safes, ammo boxes, toolboxes and many doors. Replacement meshes can move the latch. |
+
+The addon uses OpenXR for hand tracking and haptics. Registering its layer adds it to the game's existing OpenXR setup. Keep the runtime you already use to play TTWVR.
 
 ## Check the log
 

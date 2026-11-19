@@ -405,6 +405,7 @@ bool MountSceneChild(uintptr_t node, uintptr_t parent) {
   reinterpret_cast<Up>(read<Ptr>(read<Ptr>(parent) + 0xfc))(parent);
   return true;
 }
+void RetainSceneNode(uintptr_t node) { retain(node); }
 void ReleaseMountedChild(uintptr_t node) {
   if (!node) return;
   Ptr parent = read<Ptr>(node + 0x18);

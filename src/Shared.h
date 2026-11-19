@@ -51,6 +51,7 @@ struct Transform;
 void SampleKitControllers(const Pose (&poses)[2], unsigned valid);
 bool KitControllerWorld(int hand, Transform &world);
 bool MountSceneChild(uintptr_t node, uintptr_t parent);
+void RetainSceneNode(uintptr_t node);
 void ReleaseMountedChild(uintptr_t node);
 void RestoreWorldDriver();
 void PresentWorldDriver(uintptr_t root,uintptr_t mount,const Transform &wrist);

@@ -7,7 +7,8 @@ namespace locks {
 struct MountedCorrection { Vec rawTip, shownTip; Mat turn; bool valid=false; };
 bool IsWorldUnlockPending(uintptr_t ref);
 bool CompleteWorldLock(const GameState &);
-void InitWorldLocks(void *scripts);
+void InitWorldLocks(void *scripts, void *arrays);
+void TickVisibleLocks(uintptr_t closeupTarget);
 bool ParkLivePin(uintptr_t mesh);
 bool HasParkedPin();
 uintptr_t WorldDriverMount();
