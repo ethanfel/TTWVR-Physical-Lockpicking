@@ -20,10 +20,9 @@ void UpdateTarget(GameState &s) {
     return;
   s.targetRefId = *reinterpret_cast<const uint32_t *>(ref + 0xc);
   s.targetBaseId = *reinterpret_cast<const uint32_t *>(base + 0xc);
-  // Form-specific texture swaps need their own prepared cache. Do not silently
-  // display the wrong appearance for such a base form.
-  if (*reinterpret_cast<const uintptr_t *>(base + model + 0x18))
-    return;
+  // A texture swap changes the material on the existing geometry. World
+  // hardware uses that geometry, while a close-up copy needs matching materials.
+  s.targetHasTextureSwap = *reinterpret_cast<const uintptr_t *>(base + model + 0x18) != 0;
   auto *path = *reinterpret_cast<const char *const *>(base + model + 4);
   std::string name;
   const bool readablePath = Readable(path, 256);

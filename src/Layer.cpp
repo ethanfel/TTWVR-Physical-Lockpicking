@@ -1572,7 +1572,8 @@ bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
      !s.interaction.sharedKit)
     s.interaction.sharedKit=true;
   scene = Scene{s.lock, s.interaction.pick, g.cylinder};
-  scene.targetKind = s.interaction.config.useTargetObject ? g.targetKind : 0;
+  scene.targetKind = s.interaction.config.useTargetObject && !g.targetHasTextureSwap
+                         ? g.targetKind : 0;
 #ifdef LOCKPICK_TEST_INPUT
   float previewTime = -1;
   if (auto *file =

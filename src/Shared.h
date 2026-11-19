@@ -27,7 +27,7 @@ struct GameState {
   float worldUnitsPerMeter=70.f;
   unsigned kitBendNear = 0, kitRegrabNear = 0;
   int pinCount = -1;
-  bool inventoryReady = false, targetIsDoor = false;
+  bool inventoryReady = false, targetIsDoor = false, targetHasTextureSwap = false;
   unsigned targetKind = 0, targetRefId = 0, targetBaseId = 0;
 };
 struct Control {
