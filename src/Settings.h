@@ -6,16 +6,22 @@
 #include <sstream>
 #include <string>
 namespace locks {
+enum class DriverMode { SidePush, AxialTwist, SeatedLever };
+inline const char *driverModeName(DriverMode mode) {
+  if (mode == DriverMode::AxialTwist) return "axial-twist";
+  if (mode == DriverMode::SeatedLever) return "seated-lever";
+  return "side-push";
+}
 struct Ergonomics {
   float lockDistance = .42f, lockBelowEyes = .42f;
-  float fullTurnWrist = 40.f; // parsed for old INIs; lever input ignores it
+  float fullTurnWrist = 40.f; // Physical wrist travel for a full axial turn
   float pinSearchDegrees = 270.f;
   bool nativeScene = false;
   bool useTargetObject = true;
   bool useGameProps = true, useGameBackground = true;
   float backgroundBlur = 12.f, backgroundBrightness = .35f;
   bool requirePreparation = true, useHolders = true, dropPins = true;
-  bool freeDriver = true;
+  DriverMode driverMode = DriverMode::SidePush;
   float holderSide[2]{-.22f, .22f}, holderBelowEyes[2]{.60f, .60f},
       holderForward[2]{.16f, .16f};
   float handConstraint = .035f, handAngle = 20.f;
@@ -23,6 +29,7 @@ struct Ergonomics {
   void load(const std::string &text) {
     std::istringstream stream(text);
     std::string line;
+    bool explicitDriverMode = false;
     while (std::getline(stream, line)) {
       auto comment = line.find_first_of(";#");
       if (comment != std::string::npos)
@@ -49,8 +56,12 @@ struct Ergonomics {
         fullTurnWrist = std::clamp(value, 20.f, 90.f);
       if (key == "PinSearchDegrees")
         pinSearchDegrees = pinSearchSpan(value);
-      if (key == "FreeScrewdriver")
-        freeDriver = value >= .5f;
+      if (key == "ScrewdriverMode" && (value == 0 || value == 1)) {
+        driverMode = value == 1 ? DriverMode::AxialTwist : DriverMode::SidePush;
+        explicitDriverMode = true;
+      }
+      if (key == "FreeScrewdriver" && !explicitDriverMode)
+        driverMode = value >= .5f ? DriverMode::SidePush : DriverMode::SeatedLever;
       if (key == "RequirePinPreparation")
         requirePreparation = value >= .5f;
       if (key == "DropPinsToWorld")

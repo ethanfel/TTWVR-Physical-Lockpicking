@@ -72,15 +72,97 @@ class PhysicalInteraction {
 
   void release(int k, bool detach = false) {
     auto &t = tools[k];
+    if (k == 1 && config.driverMode == DriverMode::AxialTwist && t.inserted) {
+      // Park it at the actual depth on release, including a partial pull.
+      t.seatPose.p = turnWithCylinder({{}, t.pose.p}, -cylinderAngle).p;
+      if (plugFaceZ - t.pose.p.z < .003f) detach = true;
+    }
     t.owner = -1;
     t.driverTracking = false;
     t.inserting = false;
     t.insertProgress = 0;
-    if (detach || (k == 1 && config.freeDriver))
+    if (detach || (k == 1 && config.driverMode == DriverMode::SidePush))
       t.inserted = false;
     if (t.inserted)
       t.velocity = t.angular = {};
   }
+  // The contact pose defines the physical shaft. Only the admitted cylinder
+  // angle turns the visible metal, including while the lock resists.
+  void updateAxialDriver(const Pose (&hands)[2], Pose previous, float cylinder,
+                         unsigned acquired, bool manipulating, bool wasBlocked) {
+    auto &tool = tools[1];
+    const auto &pin = tools[0];
+    constexpr float seatDepth = .014f; // measured behind the visible plug face
+    constexpr float stopDepth = .018f;
+    Pose hand = tool.owner >= 0 ? hands[tool.owner] : Pose{};
+    if (tool.inserted) {
+      Vec axis = rotate(tool.seatPose.q, {0, 0, 1});
+      // A released screwdriver remains supported. Regripping establishes a
+      // fresh wrist reference at the current cylinder angle.
+      float pull = tool.owner >= 0 ? std::max(0.f, dot(hand.p - tool.seatHand, axis)) : 0;
+      tool.pose = {unit(multiply(tool.seatPose.q, axisAngle({0, 0, 1}, -cylinder * pi / 180))),
+                   turnWithCylinder({{}, tool.seatPose.p}, cylinder).p + axis * pull};
+      if (tool.owner < 0) return;
+      float depth = plugFaceZ - tool.pose.p.z;
+      tool.insertProgress = std::clamp(depth / seatDepth, 0.f, 1.f);
+      Vec delta = hand.p - tool.seatHand;
+      bool inReach = length(delta - axis * dot(delta, axis)) < .055f &&
+                     dot(delta, axis) > -.065f;
+      if (depth > 0 && inReach) {
+        if (!pin.inserted || !manipulating || (insertedEvents & 1u) || pull > .003f) {
+          tool.wristReference = hand.q;
+          tool.leverStartCylinder = cylinder;
+        } else {
+          float angle = shaftTwist(tool.seatPose, tool.wristReference, hand.q);
+          target = std::clamp(tool.leverStartCylinder +
+                              angle * (90.f / config.fullTurnWrist), 0.f, 90.f);
+          if (target < 1.f) target = 0;
+          if (target >= 89.99f) target = 90;
+        }
+        return;
+      }
+      tool.inserted = false;
+      withdrawnEvents |= 2u;
+      previous = tool.pose;
+    }
+    if (tool.owner < 0) return;
+    ToolShape shape(1, 1, 0, targetBounds);
+    shape.driverStopZ = plugFaceZ - stopDepth;
+    Pose raw{hand.q, hand.p - rotate(hand.q, handleCenter(1) * targetBounds.toolScale[1])};
+    auto contact = moveAgainstHousing(shape, previous, raw, cylinder);
+    tool.pose = contact.pose;
+    tool.blocked = contact.hit;
+    if (pin.visible && !pin.holstered) {
+      auto between = sweepToolContact(ToolShape(0, pin.opening, pin.bendYaw, targetBounds),
+                                      pin.pose, pin.pose, previous, tool.pose);
+      tool.pose = between.driver;
+      tool.blocked |= between.hit;
+    }
+    if (tool.blocked && !wasBlocked) housingHands |= 1u << tool.owner;
+    float depth = plugFaceZ - tool.pose.p.z;
+    Vec axis = rotate(tool.pose.q, {0, 0, 1});
+    bool insideSlot = false, centered = false;
+    if (depth > 0 && axis.z > .85f) {
+      Vec entry = tool.pose.p + axis * (depth / axis.z);
+      Vec slot = turnWithCylinder({{}, entry}, -cylinder).p;
+      insideSlot = std::abs(slot.x) < keywayWidth(targetBounds.style) &&
+                   std::abs(slot.y) < keywayHeight(targetBounds.style);
+      centered = insideSlot && std::abs(slot.y) <= keywayHeight(targetBounds.style) * .45f;
+    }
+    const bool enteredFromFront = tool.inserting || previous.p.z >= plugFaceZ;
+    tool.inserting = manipulating && insideSlot && enteredFromFront && !(acquired & 2u);
+    tool.insertProgress = tool.inserting ? std::clamp(depth / seatDepth, 0.f, 1.f) : 0;
+    if (!centered || tool.insertProgress < 1) return;
+    tool.inserted = true;
+    tool.inserting = false;
+    tool.seatPose = {unit(multiply(tool.pose.q, axisAngle({0, 0, 1}, cylinder * pi / 180))),
+                     turnWithCylinder({{}, tool.pose.p}, -cylinder).p};
+    tool.wristReference = hand.q;
+    tool.seatHand = hand.p;
+    tool.leverStartCylinder = cylinder;
+    insertedEvents |= 2u;
+  }
+
   void looseStep(int k, Pose lock, float dt) {
     auto &t = tools[k];
     Vec gravity = rotate(inverse(lock.q), {0, -9.81f, 0});
@@ -233,7 +315,7 @@ public:
     }
     // Both tips belong to the rotating keyway. Keep their separation while
     // the cylinder turns, including when either supported tool is released.
-    if (!config.freeDriver && initialized && tools[1].inserted && std::abs(cylinderDelta) > 1e-6f)
+    if (config.driverMode == DriverMode::SeatedLever && initialized && tools[1].inserted && std::abs(cylinderDelta) > 1e-6f)
       tools[1].pose = turnWithCylinder(tools[1].pose, cylinderDelta);
     bool wasBlocked[2]{tools[0].blocked, tools[1].blocked};
     Pose previous[2]{tools[0].pose, tools[1].pose};
@@ -304,7 +386,8 @@ public:
       t.seatedRadius = length(hand.p - turnWithCylinder({{}, mouth(best, targetBounds.style)}, cylinder).p);
       t.seatHand = hand.p;
       t.seatDepth = t.pinDepth;
-      t.seatPose = best == 1 && t.inserted ? turnWithCylinder(t.pose, -cylinder) : t.pose;
+      if (!(best == 1 && t.inserted && config.driverMode == DriverMode::AxialTwist))
+        t.seatPose = best == 1 && t.inserted ? turnWithCylinder(t.pose, -cylinder) : t.pose;
       t.lastRawTip = t.pose.p;
       if (best == 0 && t.inserted)
         t.entryAxis = normal(rotate(t.pose.q, pinHinge(t.opening, t.bendYaw)));
@@ -433,11 +516,10 @@ public:
     }
     pickNear = nearby[0];
     screwdriverNear = nearby[1];
-    // The pin retains its existing contact/depth behavior. The legacy driver
-    // stroke is used only when FreeScrewdriver is explicitly disabled.
+    // The pin and the older seated lever use this insertion path.
     for (int k = 0; k < 2; k++) {
       auto &t = tools[k];
-      if (t.owner < 0 || t.inserted || (k == 1 && config.freeDriver))
+      if (t.owner < 0 || t.inserted || (k == 1 && config.driverMode != DriverMode::SeatedLever))
         continue;
       Pose hand = handFor(k, t.owner),
            raw = held(hand, k, t.opening, t.bendYaw);
@@ -553,7 +635,7 @@ public:
     auto &driver = tools[1];
     Pose pinBeforeDriver = pin.pose;
     if (driver.owner<0 || (acquired & 2u)) driver.housingLoaded=false;
-    if (config.freeDriver && driver.owner >= 0) {
+    if (config.driverMode == DriverMode::SidePush && driver.owner >= 0) {
       bool touching = driver.inserted;
       Pose tracked = hands[driver.owner];
       Pose wanted = held(tracked, 1);
@@ -645,13 +727,15 @@ public:
         }
       }
     }
-    if (driver.owner >= 0 && driver.inserted) {
+    if (config.driverMode == DriverMode::AxialTwist) {
+      updateAxialDriver(hands, previous[1], cylinder, acquired, manipulating, wasBlocked[1]);
+    } else if (driver.owner >= 0 && driver.inserted) {
       if (!pin.inserted || !manipulating || (insertedEvents & 1u) ||
-          (!config.freeDriver && std::hypot(driver.leverStartHand.x, driver.leverStartHand.y) < .025f)) {
+          (config.driverMode == DriverMode::SeatedLever && std::hypot(driver.leverStartHand.x, driver.leverStartHand.y) < .025f)) {
         driver.leverStartHand = hands[driver.owner].p;
         driver.leverStartCylinder = cylinder;
         driver.driverDemand = cylinder;
-      } else if (config.freeDriver) {
+      } else if (config.driverMode == DriverMode::SidePush) {
         target = driver.driverDemand > 1.f ? driver.driverDemand : 0.f;
         // Match the legacy endpoint tolerance: floating-point integration
         // must not strand a valid full turn just below native completion.
@@ -673,7 +757,7 @@ public:
     // The free driver has no attached pose and falls as soon as it is released.
     for (int k = 0; k < 2; k++) {
       auto &t = tools[k];
-      if (t.owner < 0 || !t.inserted || (k == 1 && config.freeDriver))
+      if (t.owner < 0 || !t.inserted || (k == 1 && config.driverMode != DriverMode::SeatedLever))
         continue;
       Pose hand = handFor(k, t.owner);
       if (k == 0 && loadPin != pinLoaded) {
@@ -759,7 +843,7 @@ public:
       if (!t.visible)
         continue;
       if (t.owner >= 0 && !t.inserted && !t.inserting &&
-          !(k == 1 && config.freeDriver)) {
+          !(k == 1 && config.driverMode != DriverMode::SeatedLever)) {
         ToolShape shape(k, t.opening, t.bendYaw, targetBounds);
         Pose desired = held(handFor(k, t.owner), k, t.opening, t.bendYaw);
         auto contact =
@@ -812,7 +896,7 @@ public:
       }
     }
     if (pin.inserted && driver.inserted) {
-      if (config.freeDriver) {
+      if (config.driverMode != DriverMode::SeatedLever) {
         // Solid tool contact must not silently detach either tool or erase
         // tension. Draw both hands from the final collision-resolved tools.
         auto contact = sweepToolContact(ToolShape(0,pin.opening,pin.bendYaw,targetBounds),

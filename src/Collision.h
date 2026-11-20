@@ -68,6 +68,7 @@ struct ToolShape {
   float reach = 0;
   TargetBounds target;
   bool driver = false;
+  float driverStopZ = mouth(1).z - driverBearingDepth;
   void add(Vec p, float r) {
     p=p*target.toolScale[driver];
     r*=target.toolScale[driver];
@@ -131,7 +132,7 @@ struct ToolShape {
     if(driver) {
       Vec p=rotate(slotRotation,point);
       // A driver-only internal bearing. The pin keeps its deeper channel.
-      float front=mouth(1,target.style).z-driverBearingDepth;
+      float front=driverStopZ;
       float stop=boxDistance(p-Vec{0,0,front-.075f},
                             {keywayWidth(target.style),keywayHeight(target.style),.075f});
       d=std::min(d,stop);

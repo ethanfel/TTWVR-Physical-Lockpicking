@@ -80,7 +80,7 @@ int main() {
   // FreeDriver.cpp covers the default contact-only mode, including full turns.
   for (int swap = 0; swap < 2; swap++) {
     PhysicalInteraction i;
-    i.config.freeDriver = false;
+    i.config.driverMode = DriverMode::SeatedLever;
     i.config.requirePreparation = true;
     i.config.useHolders = false;
     Pose lock, p, d;

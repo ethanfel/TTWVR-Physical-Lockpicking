@@ -1109,8 +1109,9 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
   input.syncInventory(g.inventoryReady, g.pinCount);
   Vec palms[2]{left.p,right.p};
   input.kitNear=KitReach(g,palms,3);
-  Pose driverHands[2]{input.config.freeDriver ? driverHandPose(left) : left,
-                      input.config.freeDriver ? driverHandPose(right) : right};
+  bool fittedDriver = input.config.driverMode != DriverMode::SeatedLever;
+  Pose driverHands[2]{fittedDriver ? driverHandPose(left) : left,
+                      fittedDriver ? driverHandPose(right) : right};
   auto physicsStart = std::chrono::steady_clock::now();
   input.update(s.lock, compose(driverHands[0], s.renderer->DriverGrip(0)),
                compose(driverHands[1], s.renderer->DriverGrip(1)), holds[0], holds[1],
@@ -1144,7 +1145,7 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
           input.config.handConstraint, input.config.handAngle);
       continue;
     }
-    if (input.config.freeDriver) {
+    if (fittedDriver) {
       scene.hands[hand] = presentDriverHand(driverHands[hand],
           compose(s.lock, tool.pose), s.renderer->DriverGrip(hand), true,
           input.config.handConstraint, input.config.handAngle);
@@ -1201,7 +1202,7 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
         input.pickNear, input.screwdriverNear, input.pickHand,
         input.screwdriverHand, input.target, aimMask);
     const auto &driver = input.tools[1];
-    if (driver.owner >= 0 && (driver.inserted || input.config.freeDriver)) {
+    if (driver.owner >= 0 && (driver.inserted || fittedDriver)) {
       Pose localGrip = s.renderer->DriverGrip(driver.owner);
       Vec contact = world(compose(s.lock, driver.pose), handleCenter(1));
       Vec shown = world(scene.hands[driver.owner], localGrip.p);
@@ -1213,11 +1214,15 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
           "free=%d controller_gap=%.6f controller_angle=%.4f touching=%d tracked_grip=%d",
           driver.owner, length(shown-contact),
           length(world(tracked, localGrip.p)-contact), input.pinResisting,
-          input.config.freeDriver, length(scene.hands[driver.owner].p-tracked.p),
-          handAngle, driver.inserted, input.config.freeDriver);
+          input.config.driverMode == DriverMode::SidePush, length(scene.hands[driver.owner].p-tracked.p),
+          handAngle, driver.inserted, fittedDriver);
       Vec admitted = world(driver.pose, handleCenter(1));
       Vec requested = local(s.lock, world(tracked, localGrip.p));
-      Log("driver_turn touching=%d demand=%.3f step=%.4f grip_radius=%.5f tracked_radius=%.5f",
+      if (input.config.driverMode == DriverMode::AxialTwist)
+        Log("driver_twist seated=%d demand=%.2f cylinder=%.2f progress=%.3f",
+            driver.inserted, input.target, g.cylinder, driver.insertProgress);
+      else
+        Log("driver_turn touching=%d demand=%.3f step=%.4f grip_radius=%.5f tracked_radius=%.5f",
           driver.inserted, driver.driverDemand, driver.driverTurnStep,
           std::hypot(admitted.x,admitted.y),std::hypot(requested.x,requested.y));
     }
@@ -1564,11 +1569,11 @@ bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
     auto &config = s.interaction.config;
     s.lock =
         placeLock(headPose, config.lockDistance, config.lockBelowEyes);
-    Log("lock_placement distance=%.3f below_eyes=%.3f driver=lever "
-        "holders=%d preparation=%d position=%.3f,%.3f,%.3f upright=1",
-        config.lockDistance, config.lockBelowEyes,
+    Log("lock_placement distance=%.3f below_eyes=%.3f driver=%s "
+        "holders=%d preparation=%d position=%.3f,%.3f,%.3f upright=1 yaw=%.5f",
+        config.lockDistance, config.lockBelowEyes, driverModeName(config.driverMode),
         config.useHolders, config.requirePreparation, s.lock.p.x, s.lock.p.y,
-        s.lock.p.z);
+        s.lock.p.z, 2 * std::atan2(s.lock.q.y, s.lock.q.w));
     s.positioned = true;
   }
   if(g.kitSlot && g.kitRadii[g.kitSlot-1]>0 && !s.interaction.config.useHolders &&

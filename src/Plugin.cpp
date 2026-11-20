@@ -329,7 +329,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 83;  // Beta 0.1, revision 9.
+  p->version = 84;  // Beta 0.1, revision 10.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -342,7 +342,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=83 release=\"Beta 0.1\" build=cached-closeup-geometry", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=84 release=\"Beta 0.1\" build=axial-driver-option", n->runtime);
   InitMotionShaders();
   InitInventory(n->query(6));
   InitKit(n->query(6));
