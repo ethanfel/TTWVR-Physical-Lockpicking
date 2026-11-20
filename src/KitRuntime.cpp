@@ -417,9 +417,9 @@ unsigned KitReach(const GameState &g, const Vec hands[2], unsigned valid) {
   }
   return hits;
 }
-void KitButtons(unsigned down, unsigned valid, unsigned inRange, int first, unsigned uncertainRelease) {
+void KitButtons(unsigned down, unsigned valid, unsigned inRange, int first, unsigned uncertainRelease, unsigned holsterDraw) {
   unsigned bits = down | (valid << 2) | (inRange << 4) | (unsigned(first == 1) << 6);
-  sample.store(KitInputSample::make(GetTickCount64(), bits, uncertainRelease));
+  sample.store(KitInputSample::make(GetTickCount64(), bits, uncertainRelease, holsterDraw));
 }
 bool RequestCloseupExit(uintptr_t menu) {
   if (!menu || !closeLockMenu.load()) return false;
@@ -445,7 +445,7 @@ bool DismissLockMenu(const GameState &g) {
   const auto latest = sample.load();
   const unsigned input = latest.buttons();
   const bool drawing = latest.fresh(now) &&
-      (input & (input >> 2) & (input >> 4) & armed & 3u);
+      (input & (input >> 2) & (input >> 4) & latest.holsterDraw() & armed & 3u);
   if (!available || slot < 1 || slot > 8 || lastMenu || (shown[0] < 0 && shown[1] < 0 && !drawing && pending != menu))
     return false;
   // If a UI replacement has removed the Exit tile, let the ordinary menu
@@ -596,7 +596,7 @@ void TickKit(GameState &g) {
           if (RegrabWorldPin(h)) roles.pinHand = h;
           else show(h, 0, false);
         }
-      } else if ((inRange & bit) && shown[h] < 0) {
+      } else if ((inRange & latest.holsterDraw() & bit) && shown[h] < 0) {
         auto next = roles;
         int t = next.draw(h, run(stockQuery) > 0);
         if (t >= 0) {

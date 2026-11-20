@@ -17,12 +17,13 @@ struct KitWeaponControls {
   bool awaitingRelease() const { return gripsToRelease || triggersToRelease; }
 
   unsigned update(bool toolsOut, unsigned grips, unsigned triggers,
-                  unsigned gripActive, unsigned triggerActive, unsigned kitCapture = 0) {
+                  unsigned gripActive, unsigned triggerActive, unsigned kitCapture = 0,
+                  unsigned nativeGrips = 0) {
     const unsigned captured = toolsOut ? 3u : kitCapture;
     // Only an active reading of the same button can confirm its release.
-    gripsToRelease = (gripsToRelease & (grips | ~gripActive)) | (grips & captured);
+    gripsToRelease = ((gripsToRelease & (grips | ~gripActive)) | (grips & captured)) & ~nativeGrips;
     triggersToRelease = (triggersToRelease & (triggers | ~triggerActive)) | (triggers & captured);
-    gripMask = captured | gripsToRelease;
+    gripMask = (captured & ~nativeGrips) | gripsToRelease;
     triggerMask = captured | triggersToRelease;
     return gripMask | triggerMask;
   }
@@ -35,12 +36,13 @@ struct KitWeaponControls {
 // Publish the button bits and their sample time together across XR/game threads.
 struct KitInputSample {
   uint64_t packed = 0;
-  static KitInputSample make(uint64_t time, unsigned bits, unsigned uncertain = 0) {
-    return {(time << 10) | ((uncertain & 3u) << 7) | (bits & 0x7fu) | 0x200u};
+  static KitInputSample make(uint64_t time, unsigned bits, unsigned uncertain = 0, unsigned draw = 0) {
+    return {(time << 12) | ((draw & 3u) << 10) | ((uncertain & 3u) << 7) | (bits & 0x7fu) | 0x200u};
   }
   unsigned buttons() const { return unsigned(packed & 0x7fu); }
   unsigned uncertainRelease() const { return unsigned(packed >> 7) & 3u; }
-  uint64_t time() const { return packed >> 10; }
+  unsigned holsterDraw() const { return unsigned(packed >> 10) & 3u; }
+  uint64_t time() const { return packed >> 12; }
   bool fresh(uint64_t now) const {
     auto time = this->time();
     return packed && (time >= now || now - time <= 180);
@@ -52,8 +54,20 @@ struct KitInputSample {
 struct KitControlState {
   unsigned heldGrips = 0, heldTriggers = 0, previousTriggers = 0;
   unsigned down = 0, valid = 0, uncertainRelease = 0;
+  unsigned nativeGrips = 0, holsterTriggers = 0;
   void update(unsigned grips, unsigned triggers, unsigned gripActive,
-              unsigned triggerActive, unsigned tracked, unsigned allowed) {
+              unsigned triggerActive, unsigned tracked, unsigned allowed,
+              unsigned inHolster = 0, unsigned busyHands = 0) {
+    // TTWVR times the three-second grip, carries the sphere and accepts
+    // the other grip for resizing. Keep that gesture native through release.
+    nativeGrips &= grips | ~gripActive;
+    const unsigned freeGrips = grips & tracked & ~busyHands;
+    if (nativeGrips || (freeGrips & inHolster)) nativeGrips |= freeGrips;
+    grips &= ~nativeGrips;
+    const unsigned freshTriggers = triggers & tracked & triggerActive & ~previousTriggers;
+    holsterTriggers &= triggers | ~triggerActive;
+    if (nativeGrips) allowed = 0;
+    else holsterTriggers |= freshTriggers & inHolster;
     const unsigned wasHeld = heldGrips | heldTriggers;
     heldGrips = grips | (heldGrips & ~gripActive);
     heldTriggers = (heldTriggers & ~triggerActive) |

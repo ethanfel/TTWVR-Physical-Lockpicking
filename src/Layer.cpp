@@ -780,7 +780,8 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
   const unsigned allowed=inRange | g.kitBendNear | g.kitRegrabNear;
   auto &controls = s.kitControls;
   if (g.menu || !g.kitSlot) controls = {};
-  controls.update(grips,triggers,gripActive,triggerActive,valid,allowed);
+  controls.update(grips,triggers,gripActive,triggerActive,valid,allowed,
+                  inRange,g.kitHands | s.kitCapture);
   valid = controls.valid;
   unsigned down = controls.down;
   for (int n = 0; n < 2; ++n)
@@ -788,7 +789,7 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
         (!(grips & (1u << n)) || triggerTime[n] < gripTime[n]))
       gripTime[n] = triggerTime[n];
   KitButtons(down,valid,inRange & valid,s.kitPressOrder.update(down,gripTime),
-             controls.uncertainRelease);
+             controls.uncertainRelease,controls.holsterTriggers);
   if(observeKit && succeeded) {
     int driver = g.worldPick>=0 && (g.kitDrawn&2) ? 1-g.worldPick : -1;
     const unsigned inserted=g.worldSeated & ~s.previousSeated;
@@ -818,7 +819,7 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
   const bool gameplayKit = observeKit && g.kitGameplay;
   s.kitCapture = gameplayKit ? controls.capture(s.kitCapture, s.kitArmed, allowed, g.kitHands) : 0;
   const unsigned consumed = s.kitWeapons.update(gameplayKit && g.kitHands, grips, triggers,
-                                                gripActive, triggerActive, s.kitCapture);
+                                                gripActive, triggerActive, s.kitCapture, controls.nativeGrips);
   s.kitArmed=valid & ~down;
   if(kitTrace) {
     static unsigned lastRoute=~0u;

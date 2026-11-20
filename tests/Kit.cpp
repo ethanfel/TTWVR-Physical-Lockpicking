@@ -106,6 +106,42 @@ int main() {
     outside.update(0,hand,3,3,3,hand);
     assert(!outside.down);
   }
+  for (unsigned hand : {1u, 2u}) {
+    const unsigned other = 3u ^ hand;
+    KitControlState input;
+    KitWeaponControls host;
+    auto tick = [&](unsigned grips, unsigned triggers, unsigned near, unsigned busy = 0) {
+      input.update(grips, triggers, 3, 3, 3, near, near, busy);
+      unsigned captured = input.capture(0, 3, near, busy);
+      host.update(busy != 0, grips, triggers, 3, 3, captured, input.nativeGrips);
+    };
+
+    tick(hand, hand, hand);  // Simultaneous trigger and grip on the sphere.
+    assert(input.nativeGrips == hand && !input.down && !input.holsterTriggers);
+    assert(!host.blockedHands(hand, 0));
+    tick(hand, 0, 0);
+    tick(3, other, 0);  // Second grip resizes while carrying away from the old center.
+    assert(input.nativeGrips == 3 && !input.down && !input.holsterTriggers);
+    assert(!host.blockedHands(3, 0));
+    tick(0, other, other);
+    assert(!input.down && !input.holsterTriggers);
+    tick(0, 0, hand);
+    tick(0, hand, hand);
+    assert(input.down == hand && input.holsterTriggers == hand);
+    tick(0, 3, other, hand);
+    assert(input.holsterTriggers == 3 && input.down == 3);
+    const auto sample = KitInputSample::make(456, 0x55, other, input.holsterTriggers);
+    assert(sample.holsterDraw() == 3 && sample.buttons() == 0x55 &&
+           sample.uncertainRelease() == other && sample.time() == 456);
+    tick(0, hand, 0, hand);
+    tick(other, hand, other, hand);  // The occupied hand keeps its tool while the free grip edits.
+    assert(input.nativeGrips == other && input.down == hand);
+    assert(!host.blockedHands(other, 0) && host.blockedHands(0, hand) == hand);
+    tick(0, 0, 0);
+    tick(0, hand, 0);
+    tick(0, hand, hand);
+    assert(!input.holsterTriggers && !input.down);  // Held trigger enters from outside.
+  }
   KitPressOrder order;
   int64_t times[]{140,120};
   assert(order.update(3,times)==1);

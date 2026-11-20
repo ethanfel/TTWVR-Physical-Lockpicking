@@ -1,6 +1,6 @@
 # Install on Windows
 
-1. Download the [ready-to-play Beta 0.2 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.2/TTWVR-Physical-Lockpicking-Beta-0.2-Ready-to-Play.zip).
+1. Download the [ready-to-play Beta 0.2 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.2-r1/TTWVR-Physical-Lockpicking-Beta-0.2-Ready-to-Play.zip).
 2. In Mod Organizer 2, use **Install a mod from an archive** and select the ZIP. Enable the mod and **TTWVRLockKit.esp** in the profile you use for TTWVR 1.1.6 or 1.1.7.
 3. Start TTWVR with your usual headset and launcher.
 
