@@ -7,6 +7,7 @@
 #include "PinFavourite.h"
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <mutex>
 #include <wincrypt.h>
@@ -348,12 +349,17 @@ std::atomic<KitInputSample> sample{KitInputSample{}};
 uintptr_t lastMenu = 0;
 ULONGLONG nextQuery = 0, nextHolster = 0;
 bool initialized = false, available = false, clean = false;
+bool freshDraw = false;
 void show(int h, int tool, bool value) {
+  const auto start = std::chrono::steady_clock::now();
   if (!value) BeforeWorldToolRemoval(h,tool);
   auto ok = run(visual[h][tool][value]);
-  Log("kit_visual hand=%d tool=%d show=%d attach_result=%d", h, tool, value,
-      ok);
+  const double elapsed = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - start).count();
+  Log("kit_visual hand=%d tool=%d show=%d attach_result=%d elapsed_ms=%.2f",
+      h, tool, value, ok, elapsed);
   if (value && ok == 1) {
+    freshDraw = true;
     shown[h] = tool;
     occupiedHands.fetch_or(1u << h, std::memory_order_relaxed);
   }
@@ -634,8 +640,20 @@ void TickKit(GameState &g) {
     trace = nextTrace;
   }
   const bool wasParked = HasParkedPin();
+  const bool measure = roles.drawn || wasParked;
+  using Clock = std::chrono::steady_clock;
+  const auto started = measure ? Clock::now() : Clock::time_point{};
   WorldPinFrame(g,hands,roles.drawn&1 ? roles.pinHand : -1,down,pressed,valid,inRange,
                 roles.drawn&2 ? roles.handFor(1) : -1,pinHealth);
+  if (measure) {
+    static ULONGLONG nextReport = 0;
+    const double elapsed = std::chrono::duration<double, std::milli>(Clock::now() - started).count();
+    if (freshDraw || (elapsed >= 20 && now >= nextReport)) {
+      Log("kit_world_frame drawn=%u first=%d elapsed_ms=%.2f", roles.drawn, freshDraw, elapsed);
+      nextReport = now + 1000;
+    }
+  }
+  freshDraw = false;
   if(g.worldPinBroken && roles.drawn & 1u){
     pinHealth = 1;
     if (shown[roles.pinHand] == 0) show(roles.pinHand,0,false);

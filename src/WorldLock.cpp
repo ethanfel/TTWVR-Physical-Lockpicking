@@ -3,6 +3,7 @@
 #include "MountedInteraction.h"
 #include "LockRules.h"
 #include "Target.h"
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -85,7 +86,14 @@ struct VisibleLock {
   bool nearby = false;
 };
 std::map<unsigned, VisibleLock> visible;
-ULONGLONG nextVisibility = 0;
+// The visibility query already enumerates doors and containers around the
+// player. Keep identities rather than scene nodes across game-thread ticks.
+struct NearbyRef { Ptr ref; unsigned id; };
+std::vector<NearbyRef> nearbyCellRefs;
+Ptr nearbyCell = 0;
+Vec nearbyOrigin{};
+ULONGLONG nearbyUntil = 0, nextVisibility = 0;
+constexpr float visibilityRadius = 900, toolOriginRadius = 360;
 Ptr previousCloseup = 0;
 MountedInteraction model;
 LockRules rules;
@@ -382,12 +390,21 @@ bool locked(Ptr ref) {
 }
 Selection nearest(Ptr cell, const LiveTool *wire, const LiveTool *driver,
                   Vec eye) {
+  const auto scanStart = std::chrono::steady_clock::now();
+  unsigned examined = 0;
+  // GetRefs measures from the player. Use the full-cell fallback if its last
+  // sphere no longer contains the entire search sphere of either tool.
+  const bool cached = cell == nearbyCell && GetTickCount64() < nearbyUntil &&
+      (!wire || length(wire->tip - nearbyOrigin) < visibilityRadius - toolOriginRadius) &&
+      (!driver || length(driver->tip - nearbyOrigin) < visibilityRadius - toolOriginRadius);
   Selection best;
   float distance = 30; // world units, about a forearm's reach
   auto consider = [&](Ptr ref) {
+    ++examined;
+    if (!ref) return;
     Vec pos = read<Vec>(ref + 0x30);
-    if (!ref || ((!wire || length(pos - wire->tip) > 360) &&
-                 (!driver || length(pos - driver->tip) > 360)))
+    if ((!wire || length(pos - wire->tip) > toolOriginRadius) &&
+        (!driver || length(pos - driver->tip) > toolOriginRadius))
       return;
     Ptr base = read<Ptr>(ref + 0x20);
     auto type = read<unsigned char>(base + 4);
@@ -441,12 +458,28 @@ Selection nearest(Ptr cell, const LiveTool *wire, const LiveTool *driver,
       }
     }
   };
-  for (Ptr node = cell + 0xac, n = 0; node && n < 8192;
-       node = read<Ptr>(node + 4), ++n)
-    consider(read<Ptr>(node));
+  if (cached) {
+    for (const auto &item : nearbyCellRefs)
+      if (read<unsigned>(item.ref + 0xc) == item.id && read<Ptr>(item.ref + 0x40) == cell)
+        consider(item.ref);
+  } else {
+    for (Ptr node = cell + 0xac, n = 0; node && n < 8192;
+         node = read<Ptr>(node + 4), ++n)
+      consider(read<Ptr>(node));
+  }
   for (const auto &entry : visible) {
     const auto &s = entry.second.target;
     if (s.cell != cell && current(s)) consider(s.ref);
+  }
+  const double cost = std::chrono::duration<double, std::milli>(
+      std::chrono::steady_clock::now() - scanStart).count();
+  static const bool trace = GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE", nullptr, 0) > 0;
+  static ULONGLONG nextReport = 0;
+  const auto now = GetTickCount64();
+  if (trace || (cost >= 12 && now >= nextReport)) {
+    Log("live_lock_search cached=%d refs=%u elapsed_ms=%.2f target=%08x",
+        cached, examined, cost, best.id);
+    nextReport = now + 1000;
   }
   return best;
 }
@@ -539,7 +572,10 @@ void TickVisibleLocks(Ptr closeupTarget) {
   if (now < nextVisibility && previousCloseup == closeupTarget) return;
   nextVisibility = now + 500;
   previousCloseup = closeupTarget;
-  if (!read<Ptr>(player() + 0x40)) return;
+  nearbyCell = 0;
+  const Ptr pc = player(), cell = read<Ptr>(pc + 0x40);
+  if (!cell) return;
+  const Vec origin = read<Vec>(pc + 0x30);
   if (!nearbyQuery)
     nearbyQuery = api->compile("int formType\nbegin Function {formType}\n"
         "SetFunctionValue (player.GetRefs formType 1 1 900)\nend");
@@ -556,12 +592,18 @@ void TickVisibleLocks(Ptr closeupTarget) {
     nearby.resize(start + count);
     if (count && !arrays->elements(result.data.form, nearby.data() + start, nullptr)) return;
   }
+  nearbyCellRefs.clear();
+  nearbyCell = cell;
+  nearbyOrigin = origin;
+  nearbyUntil = now + 750;
   for (auto &entry : visible) entry.second.nearby = false;
   unsigned added = 0;
   for (const auto &item : nearby) {
     Ptr ref = Ptr(item.data.form);
-    if (item.type != 2 || !ref || ref == closeupTarget || ref == finishing || !locked(ref)) continue;
+    if (item.type != 2 || !ref) continue;
     unsigned id = read<unsigned>(ref + 0xc);
+    if (id && read<Ptr>(ref + 0x40) == cell) nearbyCellRefs.push_back({ref, id});
+    if (ref == closeupTarget || ref == finishing || !locked(ref)) continue;
     Ptr root = rootOf(ref);
     if (!root || !id) continue;
     auto found = visible.find(id);
@@ -647,6 +689,8 @@ void ResetWorldLock(bool unloading) {
   if (unloading) {
     for (const auto &entry : visible) ReleaseMountedChild(entry.second.target.hardware);
     visible.clear();
+    nearbyCellRefs.clear();
+    nearbyCell = 0;
     nextVisibility = 0;
     previousCloseup = 0;
     puzzle = {};
@@ -710,8 +754,8 @@ bool WorldLockFrame(GameState &g, const LiveTool *wire, const Transform *hand,
   const bool inAir = !model.pin && model.pinContact.surface == LiveSurface::Air &&
                      model.bladeContact.surface == LiveSurface::Air;
   if (crossedDoor || (inAir && now >= nextScan)) {
-    nextScan = now + 250;
     auto candidate = nearest(cell, wire, hand ? &d : nullptr, eye);
+    nextScan = GetTickCount64() + 250;
     if (candidate.ref && candidate.ref == active.ref) {
       active.level = candidate.level;
       if (candidate.side != active.side) {
