@@ -21,7 +21,9 @@ int main() {
   assert(close(settings.fullTurnWrist, 20));
   assert(close(settings.insertRadius, .028f));
   assert(close(settings.withdrawTravel, .1f));
-  assert(close(settings.minimumPuzzleLight, 35)); // existing INIs
+  assert(close(settings.minimumPuzzleLight, 0)); // existing INIs without this key
+  settings.load("MinimumPuzzleLight=35\n");
+  assert(close(settings.minimumPuzzleLight, 35));
   settings.load("MinimumPuzzleLight=0\n");
   assert(close(settings.minimumPuzzleLight, 0));
   settings.load("MinimumPuzzleLight=150\n");

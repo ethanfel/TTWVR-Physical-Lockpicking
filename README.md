@@ -2,7 +2,7 @@
 
 Pick a door, safe or ammo box with both hands in VR. Draw the bobby pin and screwdriver from one holster, bend the pin, then feel the lock resist as you twist the screwdriver.
 
-**[Download the ready-to-play Beta 0.2 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.2-r4/TTWVR-Physical-Lockpicking-Beta-0.2-Ready-to-Play.zip)**
+**[Download the ready-to-play Beta 0.2 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.2-r5/TTWVR-Physical-Lockpicking-Beta-0.2-Ready-to-Play.zip)**
 
 ## Install
 
@@ -24,6 +24,6 @@ The addon takes controller input and haptics from the backend TTWVR selects, inc
 
 A 45° wrist twist requests a full turn. Hold your wrist still to hold your progress, ease it back to reduce pressure, or pull the blade out to release it. To adjust sensitivity, edit `FullTurnWristDegrees` under `[Ergonomics]` in `NVSE/Plugins/TTWVRPhysicalLockpicking.ini`. For the previous sideways push in the lower slot, set `ScrewdriverMode=0`. Restart Fallout after changing the INI. To restore the defaults, close Fallout and delete the addon INI. The addon recreates it on the next launch.
 
-A picked door stays closed until you open it. Containers open on success. For the close-up interaction with the pin box and screwdriver tin, stow both tools and activate the lock. In a dark room, a soft light helps you see the keyhole and tools. Set `MinimumPuzzleLight` in the addon INI to adjust it (default 35, 0 turns it off). Press **B** on the right Touch controller to leave the close-up.
+A picked door stays closed until you open it. Containers open on success. For the close-up interaction with the pin box and screwdriver tin, stow both tools and activate the lock. Switch on your Pip-Boy light before opening the close-up to light the lock and tools. The optional minimum brightness for the close-up is off by default (`MinimumPuzzleLight=0`). Raise it in the addon INI if you want extra visibility in dark rooms. Press **B** on the right Touch controller to leave the close-up.
 
 [Help and removal](docs/help.md) · [Manual setup and building from source](docs/advanced.md) · [GPL-3.0-only](LICENSE)

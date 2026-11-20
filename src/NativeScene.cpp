@@ -47,6 +47,7 @@ bool calibrated = false;
 constexpr float units = 70.f;
 uint64_t serial = 0, applied = 0;
 Ptr root = 0, owner = 0, menu = 0;
+bool lightingRegistered = false;
 unsigned ownerId = 0, kind = 0;
 bool failed = false;
 struct Batch {
@@ -57,6 +58,7 @@ struct Batch {
   Vec handLight{};
   Ptr material = 0;
   Vec originalEmission{};
+  bool visible = false;
 };
 std::map<unsigned, Batch> batches;
 bool object(Ptr p) {
@@ -164,10 +166,27 @@ void updateCloseupLight(float minimum) {
   previousFill = deficit;
 }
 
+// On Fallout 1.4.0.525 AddObject queues a retained subtree for the world
+// renderer to associate with lights using its current bounds. RemoveObject
+// drops the geometry from those lights before the JIP clone is detached.
+void registerWorkspaceLighting(bool add) {
+  const Ptr base = reinterpret_cast<Ptr>(GetModuleHandleW(nullptr));
+  const Ptr shadowScene = read<Ptr>(base + 0xdf91c8);
+  if (!shadowScene || !root) return;
+  using UpdateReceiver = void(__thiscall *)(Ptr, Ptr);
+  const auto updateReceiver = reinterpret_cast<UpdateReceiver>(
+      base + (add ? 0x75eeb0 : 0x75b1c0));
+  updateReceiver(shadowScene, root);
+  lightingRegistered = add;
+}
+
 void releaseScene() {
   presented = 0;
-  if (root && object(root))
+  if (root && object(root)) {
     hide(root, true);
+    if (lightingRegistered) registerWorkspaceLighting(false);
+  }
+  lightingRegistered = false;
   // JIP clones may share cached geometry data. Restore the declared capacity
   // before detaching, so reopening cannot mistake the previous active count
   // for the allocation size.
@@ -299,8 +318,12 @@ bool update(const Packet &p) {
   if (!finite(transform.position) || length(transform.position) > 1e7f)
     return false;
   at<Transform>(root + 0x34) = transform;
-  for (auto &entry : batches)
-    at<uint32_t>(entry.second.node + 0x30) |= 1u;
+  for (auto &entry : batches) {
+    auto &flags = at<uint32_t>(entry.second.node + 0x30);
+    entry.second.visible = !(flags & 1u);
+    flags |= 1u;
+  }
+  bool needsLighting = !lightingRegistered;
   size_t covered = 0;
   unsigned uploads = 0, reused = 0, relit = 0;
   for (const auto &draw : p.mesh.draws) {
@@ -317,6 +340,7 @@ bool update(const Packet &p) {
       return false;
     }
     auto &b = found->second;
+    needsLighting |= !b.visible;
     Ptr d = b.data;
     size_t n = draw.count;
     at<Transform>(b.node + 0x34) = {matrix(draw.pose.q), draw.pose.p, 1};
@@ -450,6 +474,10 @@ bool update(const Packet &p) {
   using Up = void(__thiscall *)(void *);
   reinterpret_cast<Up>(read<Ptr>(read<Ptr>(parent) + 0xfc))((void *)parent);
 
+  // The file contains tiny, hidden placeholders. Register the actual meshes
+  // after the workspace is placed and its world bounds have propagated.
+  // Repeat for a newly visible tool, never just because a frame elapsed.
+  if (needsLighting) registerWorkspaceLighting(true);
   return true;
 }
 } // namespace

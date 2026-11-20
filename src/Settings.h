@@ -17,7 +17,7 @@ struct Ergonomics {
   float fullTurnWrist = 45.f; // Physical wrist travel for a full axial turn
   float pinSearchDegrees = 270.f;
   bool nativeScene = false;
-  float minimumPuzzleLight = 35.f;
+  float minimumPuzzleLight = 0.f;
   bool useTargetObject = true;
   bool useGameProps = true, useGameBackground = true;
   float backgroundBlur = 12.f, backgroundBrightness = .35f;
