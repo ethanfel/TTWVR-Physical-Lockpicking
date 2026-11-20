@@ -95,6 +95,7 @@ struct Session {
   bool presenting = false, captureInputs = false;
   bool backDown = false, consumeBack = false, triedExit = false;
   unsigned kitCapture = 0, kitArmed = 0;
+  HolsterGrip kitHolster;
   KitControlState kitControls;
   KitWeaponControls kitWeapons;
   std::vector<XrActiveActionSet> activeSets;
@@ -775,13 +776,18 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
     }
   }
   s.kitPhysicalDown=physical;
-  // A trigger started at the shared holster or free wire is also a pinch.
-  // A trigger already held during regular play must not acquire a tool.
-  const unsigned allowed=inRange | g.kitBendNear | g.kitRegrabNear;
+  const bool gameplayKit = observeKit && g.kitGameplay;
+  auto &holster = s.kitHolster;
+  const unsigned slot = gameplayKit && g.kitSlot && g.kitSlot <= 8 &&
+                        g.kitRadii[g.kitSlot-1] > 0 ? g.kitSlot : 0;
+  holster.update(slot,grips,gripActive,valid,inRange,g.kitHands | s.kitCapture,
+                 g.holsterEditing,palms,GetTickCount64());
+  // Trigger pinches still work on the wire and on a parked pin.
+  const unsigned pinch = (g.kitBendNear | g.kitRegrabNear) & ~holster.nativeGrips;
+  const unsigned allowed = pinch | holster.drawn;
   auto &controls = s.kitControls;
   if (g.menu || !g.kitSlot) controls = {};
-  controls.update(grips,triggers,gripActive,triggerActive,valid,allowed,
-                  inRange,g.kitHands | s.kitCapture);
+  controls.update(grips & ~holster.nativeGrips,triggers,gripActive,triggerActive,valid,pinch);
   valid = controls.valid;
   unsigned down = controls.down;
   for (int n = 0; n < 2; ++n)
@@ -789,7 +795,7 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
         (!(grips & (1u << n)) || triggerTime[n] < gripTime[n]))
       gripTime[n] = triggerTime[n];
   KitButtons(down,valid,inRange & valid,s.kitPressOrder.update(down,gripTime),
-             controls.uncertainRelease,controls.holsterTriggers);
+             controls.uncertainRelease,holster.drawn);
   if(observeKit && succeeded) {
     int driver = g.worldPick>=0 && (g.kitDrawn&2) ? 1-g.worldPick : -1;
     const unsigned inserted=g.worldSeated & ~s.previousSeated;
@@ -816,10 +822,9 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
   }
   // Crossing the kit with a grip pressed at an ordinary holster must
   // preserve that grip until its release.
-  const bool gameplayKit = observeKit && g.kitGameplay;
   s.kitCapture = gameplayKit ? controls.capture(s.kitCapture, s.kitArmed, allowed, g.kitHands) : 0;
   const unsigned consumed = s.kitWeapons.update(gameplayKit && g.kitHands, grips, triggers,
-                                                gripActive, triggerActive, s.kitCapture, controls.nativeGrips);
+                                                gripActive, triggerActive, s.kitCapture, holster.nativeGrips);
   s.kitArmed=valid & ~down;
   if(kitTrace) {
     static unsigned lastRoute=~0u;

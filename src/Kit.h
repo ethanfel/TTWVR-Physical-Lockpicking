@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "Math.h"
 #include <cstdint>
 namespace locks {
 // TTWVR's Loot Menu preference uses Both, Left, Right, Off in this order.
@@ -49,25 +50,58 @@ struct KitInputSample {
   }
 };
 
+// A grip started on a numbered sphere belongs to TTWVR until the hand
+// withdraws. A completed native edit owns both the carry and resize grips.
+struct HolsterGrip {
+  unsigned slot = 0, ready = 0, pending = 0, nativeGrips = 0, drawn = 0;
+  uint64_t started[2]{};
+  Vec origin[2]{};
+
+  void update(unsigned activeSlot, unsigned grips, unsigned active, unsigned tracked,
+              unsigned inRange, unsigned busy, bool editing, const Vec (&hands)[2], uint64_t now) {
+    if (slot != activeSlot) {
+      slot = activeSlot;
+      pending = drawn = ready = 0;
+    }
+    const unsigned pressed = ready & grips & active & tracked;
+    ready = (ready & ~active) | (active & tracked & ~grips);
+    nativeGrips &= grips | ~active;
+    drawn &= grips | ~active;
+    pending &= grips & active & tracked;
+    if (!slot) return;
+    if (editing) {
+      pending = 0;
+      nativeGrips |= grips & ~busy & ~drawn;
+      return;
+    }
+    const unsigned begin = pressed & inRange & ~busy & ~nativeGrips;
+    pending |= begin;
+    nativeGrips |= begin;
+    for (unsigned hand = 0; hand < 2; ++hand) {
+      const unsigned bit = 1u << hand;
+      if (!(pending & bit)) continue;
+      if (begin & bit) {
+        started[hand] = now;
+        origin[hand] = hands[hand];
+      } else if (now - started[hand] >= 3000) {
+        // Leave the grip with the host even if its edit flag arrives a frame late.
+        pending &= ~bit;
+      } else if (!(inRange & bit) && length(hands[hand] - origin[hand]) >= .025f) {
+        pending &= ~bit;
+        nativeGrips &= ~bit;
+        drawn |= bit;
+      }
+    }
+  }
+};
+
 // Keep the identity of a held input across independent pose, grip and trigger
 // interruptions. A different, idle action cannot confirm its release.
 struct KitControlState {
   unsigned heldGrips = 0, heldTriggers = 0, previousTriggers = 0;
   unsigned down = 0, valid = 0, uncertainRelease = 0;
-  unsigned nativeGrips = 0, holsterTriggers = 0;
   void update(unsigned grips, unsigned triggers, unsigned gripActive,
-              unsigned triggerActive, unsigned tracked, unsigned allowed,
-              unsigned inHolster = 0, unsigned busyHands = 0) {
-    // TTWVR times the three-second grip, carries the sphere and accepts
-    // the other grip for resizing. Keep that gesture native through release.
-    nativeGrips &= grips | ~gripActive;
-    const unsigned freeGrips = grips & tracked & ~busyHands;
-    if (nativeGrips || (freeGrips & inHolster)) nativeGrips |= freeGrips;
-    grips &= ~nativeGrips;
-    const unsigned freshTriggers = triggers & tracked & triggerActive & ~previousTriggers;
-    holsterTriggers &= triggers | ~triggerActive;
-    if (nativeGrips) allowed = 0;
-    else holsterTriggers |= freshTriggers & inHolster;
+              unsigned triggerActive, unsigned tracked, unsigned allowed) {
     const unsigned wasHeld = heldGrips | heldTriggers;
     heldGrips = grips | (heldGrips & ~gripActive);
     heldTriggers = (heldTriggers & ~triggerActive) |

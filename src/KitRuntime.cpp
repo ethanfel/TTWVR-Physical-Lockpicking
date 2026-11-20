@@ -68,7 +68,7 @@ const LootPreference *__cdecl kitLootPreference() {
 void *visual[2][2][2]{};
 uintptr_t host = 0;
 struct Layout {
-  unsigned bones, hands, bindings, positions, enabled, ready, units;
+  unsigned bones, hands, bindings, positions, enabled, ready, units, editors;
 };
 Layout layout{};
 // TTWVR computes all eight world-space centers for its holster hit tests,
@@ -167,10 +167,10 @@ bool init() {
   if (digest == "503266c4f4c2350b357c8c15021d8bde28973254745d9302b8e3cfde66489a27" || digest ==
       "63712922499b2155a3d2c6f54abbdfc1eaf95d08712b937c6276d6a8ae0d774d")
     layout = {286039420, 291467216, 285330768, 291471160,
-              291471288, 286043596, 286058864};
+              291471288, 286043596, 286058864, 285330980};
   else if (version117)
     layout = {286154492, 291584816, 285445496, 291588760,
-              291588888, 286158668, 286173944};
+              291588888, 286158668, 286173944, 285445708};
   else {
     Log("kit_disabled unknown_holster_layout=1");
     return false;
@@ -445,7 +445,7 @@ bool DismissLockMenu(const GameState &g) {
   const auto latest = sample.load();
   const unsigned input = latest.buttons();
   const bool drawing = latest.fresh(now) &&
-      (input & (input >> 2) & (input >> 4) & latest.holsterDraw() & armed & 3u);
+      (input & (input >> 2) & latest.holsterDraw() & armed & 3u);
   if (!available || slot < 1 || slot > 8 || lastMenu || (shown[0] < 0 && shown[1] < 0 && !drawing && pending != menu))
     return false;
   // If a UI replacement has removed the Exit tile, let the ordinary menu
@@ -516,6 +516,9 @@ void TickKit(GameState &g) {
     WorldPinFrame(g,hands,-1,0,0,0,0,-1,pinHealth);
     return;
   }
+  // The two native per-hand records store the slot, hold time and editing flag.
+  const uintptr_t editors = host + layout.editors;
+  g.holsterEditing = read<uint8_t>(editors + 8) || read<uint8_t>(editors + 16 + 8);
   locateHolsters(g);
   if (g.menu || lastMenu) {
     if (g.menu != lastMenu) {
@@ -596,7 +599,7 @@ void TickKit(GameState &g) {
           if (RegrabWorldPin(h)) roles.pinHand = h;
           else show(h, 0, false);
         }
-      } else if ((inRange & latest.holsterDraw() & bit) && shown[h] < 0) {
+      } else if ((latest.holsterDraw() & bit) && shown[h] < 0) {
         auto next = roles;
         int t = next.draw(h, run(stockQuery) > 0);
         if (t >= 0) {

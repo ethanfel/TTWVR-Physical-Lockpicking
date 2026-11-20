@@ -108,39 +108,62 @@ int main() {
   }
   for (unsigned hand : {1u, 2u}) {
     const unsigned other = 3u ^ hand;
+    HolsterGrip holster;
     KitControlState input;
     KitWeaponControls host;
-    auto tick = [&](unsigned grips, unsigned triggers, unsigned near, unsigned busy = 0) {
-      input.update(grips, triggers, 3, 3, 3, near, near, busy);
-      unsigned captured = input.capture(0, 3, near, busy);
-      host.update(busy != 0, grips, triggers, 3, 3, captured, input.nativeGrips);
+    Vec poses[2]{};
+    uint64_t now = 100;
+    const int h = hand == 1 ? 0 : 1, o = 1-h;
+    auto tick = [&](unsigned grips, unsigned triggers, unsigned near, bool editing = false,
+                    unsigned active = 3, unsigned tracked = 3, unsigned slot = 4) {
+      holster.update(slot, grips, active, tracked, near, 0, editing, poses, now++);
+      input.update(grips & ~holster.nativeGrips, triggers, active, 3, tracked, 0);
+      host.update(holster.drawn != 0, grips, triggers, active, 3, holster.drawn, holster.nativeGrips);
     };
-
-    tick(hand, hand, hand);  // Simultaneous trigger and grip on the sphere.
-    assert(input.nativeGrips == hand && !input.down && !input.holsterTriggers);
-    assert(!host.blockedHands(hand, 0));
-    tick(hand, 0, 0);
-    tick(3, other, 0);  // Second grip resizes while carrying away from the old center.
-    assert(input.nativeGrips == 3 && !input.down && !input.holsterTriggers);
-    assert(!host.blockedHands(3, 0));
-    tick(0, other, other);
-    assert(!input.down && !input.holsterTriggers);
     tick(0, 0, hand);
-    tick(0, hand, hand);
-    assert(input.down == hand && input.holsterTriggers == hand);
-    tick(0, 3, other, hand);
-    assert(input.holsterTriggers == 3 && input.down == 3);
-    const auto sample = KitInputSample::make(456, 0x55, other, input.holsterTriggers);
+    tick(0, hand, hand);  // Trigger alone never draws.
+    assert(!input.down && !holster.drawn);
+    tick(hand, hand, hand);
+    assert(holster.nativeGrips == hand && !input.down && !holster.drawn);
+    tick(hand, 0, 0);  // A moving sphere alone cannot draw from a stationary hand.
+    assert(!holster.drawn);
+    poses[h].x += .12f;
+    tick(hand, 0, 0);
+    assert(input.down == hand && holster.drawn == hand && !holster.nativeGrips);
+    tick(3, 0, other);
+    assert(!host.blockedHands(other, 0) && holster.drawn == hand);
+    poses[o].x += .12f;
+    tick(3, 0, 0);
+    assert(holster.drawn == 3 && input.down == 3);
+    const auto sample = KitInputSample::make(456, 0x55, other, holster.drawn);
     assert(sample.holsterDraw() == 3 && sample.buttons() == 0x55 &&
            sample.uncertainRelease() == other && sample.time() == 456);
-    tick(0, hand, 0, hand);
-    tick(other, hand, other, hand);  // The occupied hand keeps its tool while the free grip edits.
-    assert(input.nativeGrips == other && input.down == hand);
-    assert(!host.blockedHands(other, 0) && host.blockedHands(0, hand) == hand);
     tick(0, 0, 0);
-    tick(0, hand, 0);
-    tick(0, hand, hand);
-    assert(!input.holsterTriggers && !input.down);  // Held trigger enters from outside.
+    tick(hand, 0, hand);
+    now += 3000;
+    tick(hand, 0, hand);
+    poses[h].x += .15f;
+    tick(hand, 0, 0);
+    assert(!holster.drawn && !host.blockedHands(hand, 0));
+    tick(3, other, 0, true);
+    assert(holster.nativeGrips == 3 && !input.down && !holster.drawn);
+    tick(other, 0, 0);
+    assert(holster.nativeGrips == other && !holster.drawn);
+    tick(0, 0, 0);
+    tick(hand, 0, 0);
+    tick(hand, 0, hand);
+    poses[h].x += .10f;
+    tick(hand, 0, 0);
+    assert(!holster.drawn);  // A grip that started outside cannot draw on crossing.
+    for (int interrupt = 0; interrupt < 4; ++interrupt) {
+      tick(0, 0, hand);
+      tick(hand, 0, hand);
+      tick(hand, 0, hand, interrupt == 0, interrupt == 1 ? other : 3,
+           interrupt == 2 ? other : 3, interrupt == 3 ? 0 : 4);
+      poses[h].x += .1f;
+      tick(hand, 0, 0);
+      assert(!holster.drawn);
+    }
   }
   KitPressOrder order;
   int64_t times[]{140,120};
