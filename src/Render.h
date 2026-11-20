@@ -2,6 +2,7 @@
 #pragma once
 #include "Background.h"
 #include "GameCapture.h"
+#include "HandGeometry.h"
 #include "LockMesh.h"
 #include "Physical.h"
 #include "Props.h"
@@ -33,9 +34,6 @@ struct Scene {
   int pinStock = -1, storedPinCount = 0;
   std::array<StoredPin, pinBoxCapacity> storedPins;
 };
-struct SceneVertex { Vec p, c, uv, n; };
-// A pending game-thread packet owns its immutable geometry even if the renderer switches targets.
-using LocalVertices = std::shared_ptr<const std::vector<SceneVertex>>;
 struct CachedNativePart {
   const PropMesh *asset = nullptr;
   LockMeshSize size = LockMeshSize::Unchanged;
@@ -47,6 +45,7 @@ struct SceneDraw {
   size_t begin = 0, count = 0;
   Pose pose;
   LocalVertices localVertices;
+  bool handLighting = false;
 };
 struct SceneGeometry {
   std::vector<SceneVertex> vertices;
@@ -54,19 +53,6 @@ struct SceneGeometry {
 };
 struct Vertex {
   float p[4], color[4], uv[3], normal[3], world[3], view[3];
-};
-struct HandVertex {
-  Vec open, closed;
-  float u, v;
-  Vec normalOpen, normalClosed, pinched, normalPinched;
-};
-struct HandMesh {
-  Vec pinchPoint;
-  Pose driverGrip;
-  bool hasDriverGrip = false;
-  bool hasPinch = false;
-  std::vector<HandVertex> vertices;
-  std::vector<std::array<uint32_t, 3>> triangles;
 };
 class Renderer {
   // Full 18-pin round-wire pile, both hands and the padlock exceed 64K.

@@ -20,8 +20,8 @@ struct Mesh {
   std::vector<SceneDraw> draws;
   unsigned object = 0;
   std::map<unsigned, CachedNativePart> *nativeParts = nullptr;
-  void localDraw(const LocalVertices &vertices, Pose pose) {
-    draws.push_back({object++, v.size(), vertices->size(), pose, vertices});
+  void localDraw(const LocalVertices &vertices, Pose pose, bool handLighting = false) {
+    draws.push_back({object++, v.size(), vertices->size(), pose, vertices, handLighting});
   }
   void finish(size_t first, Pose pose = {}) {
     draws.push_back({object++, first, v.size()-first, pose});
@@ -126,9 +126,9 @@ struct Mesh {
     }
   }
 };
-Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
+Mesh mesh(const Scene &s, HandMesh (&hands)[2], const Props *props,
           const TargetAsset *target, const PropMesh *plugSkirts,
-          std::map<unsigned, CachedNativePart> *nativeParts) {
+          std::map<unsigned, CachedNativePart> *nativeParts, bool native) {
   Mesh m;
   m.nativeParts = nativeParts;
   Vec brass{.48f, .27f, .075f}, steel{.44f, .5f, .52f};
@@ -322,10 +322,14 @@ Mesh mesh(const Scene &s, const HandMesh (&hands)[2], const Props *props,
       if (!hands[n].triangles.empty()) {
         size_t first = m.v.size();
         m.object = 210 + n;
-        const auto &asset = hands[n];
+        auto &asset = hands[n];
         Pose hand = relative(s.lock, s.hands[n]);
         float curl = std::clamp(s.holds[n], 0.f, 1.f);
         bool pinch = (s.pinchHands & (1u << n)) && asset.hasPinch;
+        if (native) {
+          m.localDraw(asset.nativeVertices(curl, pinch), hand, true);
+          continue;
+        }
         for (auto tri : asset.triangles) {
           Vec points[3];
           for (int j = 0; j < 3; j++) {
@@ -838,7 +842,7 @@ SceneGeometry Renderer::BuildScene(const Scene &scene, bool native) {
   auto m =
       mesh(shown, hands,
            propsReady && scene.config.useGameProps ? &props : nullptr, target, plugSkirts,
-           native && propsReady && scene.config.useGameProps ? &nativeParts : nullptr);
+           native && propsReady && scene.config.useGameProps ? &nativeParts : nullptr, native);
   return {std::move(m.v),std::move(m.draws)};
 }
 bool Renderer::Draw(ID3D11Texture2D *image, const XrView &view,

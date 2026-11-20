@@ -54,6 +54,7 @@ struct Batch {
   unsigned capacity = 0;
   std::vector<SceneVertex> previous;
   LocalVertices localVertices;
+  Vec handLight{};
 };
 std::map<unsigned, Batch> batches;
 bool object(Ptr p) {
@@ -236,7 +237,7 @@ bool update(const Packet &p) {
   for (auto &entry : batches)
     at<uint32_t>(entry.second.node + 0x30) |= 1u;
   size_t covered = 0;
-  unsigned uploads = 0, reused = 0;
+  unsigned uploads = 0, reused = 0, relit = 0;
   for (const auto &draw : p.mesh.draws) {
     if (draw.begin != covered || !draw.count || draw.count % 3 ||
         (draw.localVertices ? draw.count != draw.localVertices->size()
@@ -254,7 +255,21 @@ bool update(const Packet &p) {
     Ptr d = b.data;
     size_t n = draw.count;
     at<Transform>(b.node + 0x34) = {matrix(draw.pose.q), draw.pose.p, 1};
+    const Vec light = draw.handLighting ? handLocalLight(draw.pose.q) : Vec{};
     if (draw.localVertices && b.localVertices == draw.localVertices) {
+      if (draw.handLighting && (light.x != b.handLight.x || light.y != b.handLight.y ||
+                                light.z != b.handLight.z)) {
+        auto *colors = read<float *>(d + 0x28);
+        if (!Readable(colors, n * 4 * sizeof(float)))
+          return false;
+        for (size_t i = 0; i < n; ++i) {
+          float shade = handShade((*draw.localVertices)[i].n, light);
+          colors[4 * i] = colors[4 * i + 1] = colors[4 * i + 2] = shade;
+        }
+        at<uint16_t>(d + 0xe) |= 0x0fff;
+        b.handLight = light;
+        ++relit;
+      }
       at<uint32_t>(b.node + 0x30) &= ~1u;
       ++reused;
       continue;
@@ -282,7 +297,7 @@ bool update(const Packet &p) {
         x.c = x.c * .85f;
       vertices.push_back(x);
     }
-    bool changed = b.previous.size() != n;
+    bool changed = draw.handLighting || b.previous.size() != n;
     for (size_t i = 0; !changed && i < n; i++) {
       const auto &a = vertices[i], &z = b.previous[i];
       changed = length(a.p - z.p) > 1e-6f || length(a.n - z.n) > 1e-5f ||
@@ -329,9 +344,10 @@ bool update(const Packet &p) {
         normals[2 * n + i] = u;
         uv[2 * i] = x.uv.x;
         uv[2 * i + 1] = x.uv.y;
-        colors[4 * i] = x.c.x;
-        colors[4 * i + 1] = x.c.y;
-        colors[4 * i + 2] = x.c.z;
+        float shade = draw.handLighting ? handShade(x.n, light) : 1.f;
+        colors[4 * i] = x.c.x * shade;
+        colors[4 * i + 1] = x.c.y * shade;
+        colors[4 * i + 2] = x.c.z * shade;
         colors[4 * i + 3] = 1;
         radius = std::max(radius, dot(x.p, x.p));
       }
@@ -344,7 +360,9 @@ bool update(const Packet &p) {
     // Low 12 bits mark dirty channels. Preserve the consistency bits:
     // changing those to 0xC000 makes renderer buffer/history identity unstable.
     at<uint16_t>(d + 0xe) |= 0x0fff;
-    b.previous = std::move(vertices);
+    b.handLight = light;
+    if (!draw.handLighting)
+      b.previous = std::move(vertices);
     at<uint32_t>(b.node + 0x30) &= ~1u;
   }
   if (covered != p.mesh.vertices.size()) {
@@ -352,8 +370,8 @@ bool update(const Packet &p) {
     return false;
   }
   if (p.serial % 180 == 0)
-    Log("native_scene_upload draws=%u uploads=%u cached=%u dynamic_vertices=%u",
-        unsigned(p.mesh.draws.size()), uploads, reused, unsigned(covered));
+    Log("native_scene_upload draws=%u uploads=%u cached=%u dynamic_vertices=%u relit=%u",
+        unsigned(p.mesh.draws.size()), uploads, reused, unsigned(covered), relit);
   hide(root, false);
   struct Update {
     float time = 0;
