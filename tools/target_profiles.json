@@ -785,7 +785,12 @@
     "static_scene": true,
     "mount_basis": "solid surface at handle/latch/panel",
     "category": "DOOR",
-    "source_sha256": "ac77e64ae1d8b4f996d4f92b227b6f85f253bdbb8899ac9d8f5c8ab3b3421e3c"
+    "source_sha256": "ac77e64ae1d8b4f996d4f92b227b6f85f253bdbb8899ac9d8f5c8ab3b3421e3c",
+    "reverse_anchor": [
+      -33.221814,
+      2.499969,
+      75.220758
+    ]
   },
   {
     "kind": 29,
@@ -811,7 +816,12 @@
     "static_scene": true,
     "mount_basis": "solid surface at handle/latch/panel",
     "category": "DOOR",
-    "source_sha256": "47ff1f85eb7fb8369a8a797b11f3838a9fb7d9529bfc8384d4f44e342ab45311"
+    "source_sha256": "47ff1f85eb7fb8369a8a797b11f3838a9fb7d9529bfc8384d4f44e342ab45311",
+    "reverse_anchor": [
+      -123.062089,
+      4.614708,
+      102.729473
+    ]
   },
   {
     "kind": 30,

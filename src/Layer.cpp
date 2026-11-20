@@ -115,6 +115,8 @@ struct Session {
   uint64_t timingStart = 0;
   unsigned timingFrames = 0;
   unsigned nativeTimingFrames = 0;
+  uintptr_t lastFrameMenu = 0;
+  uint64_t lastFrameStart = 0, lastHitchReport = 0;
   double inputMs = 0, geometryMs = 0, publishMs = 0, actionsMs = 0, physicsMs = 0;
   uintptr_t timingMenu = 0;
   bool timingNative = false;
@@ -1644,6 +1646,10 @@ bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
 }
 void NativeInputFrame(Session &s) {
   auto g = Snapshot();
+  const auto tick = GetTickCount64();
+  const auto gap = g.menu && g.menu == s.lastFrameMenu ? tick - s.lastFrameStart : 0;
+  s.lastFrameStart = tick;
+  s.lastFrameMenu = g.menu;
   if (!g.menu || !NativeReady() || s.bypassMenu == g.menu || s.failed ||
       (!s.backend && (!s.localSpace || !s.viewSpace)) || !ReadyRenderer(s)) {
     NativeSceneStop();
@@ -1672,6 +1678,14 @@ void NativeInputFrame(Session &s) {
   bool ready = NativeScenePublish(g, scene, std::move(geometry));
   auto published = Clock::now();
   using Milliseconds = std::chrono::duration<double, std::milli>;
+  const double frameMs = Milliseconds(published - start).count();
+  if ((gap >= 50 || frameMs >= 25) && tick - s.lastHitchReport >= 1000) {
+    Log("lock_frame_hitch ref=%08x kind=%u stage=%u interval_ms=%llu input_ms=%.2f build_ms=%.2f publish_ms=%.2f",
+        g.targetRefId, g.targetKind, g.stage, (unsigned long long)gap,
+        Milliseconds(prepared - start).count(), Milliseconds(built - prepared).count(),
+        Milliseconds(published - built).count());
+    s.lastHitchReport = tick;
+  }
   s.inputMs += Milliseconds(prepared - start).count();
   s.geometryMs += Milliseconds(built - prepared).count();
   s.publishMs += Milliseconds(published - built).count();

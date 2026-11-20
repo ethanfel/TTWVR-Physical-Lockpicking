@@ -148,6 +148,15 @@ struct ToolShape {
                    distance(p+Vec{0,e,0},angle)-distance(p-Vec{0,e,0},angle),
                    distance(p+Vec{0,0,e},angle)-distance(p-Vec{0,0,e},angle)});
   }
+  // All solid surfaces lie behind this plane. Subtract a rounding margin
+  // before using it to reject samples in front of the lock.
+  float frontLimit() const {
+    float front = std::max({plugFaceZ, safeFront, padFront, shackleRadius,
+                            stapleRadius + stapleWire, driverStopZ});
+    if (target.enabled) front = std::max(front, target.high.z);
+    if (target.panel) front = std::max(front, target.panel->highest);
+    return front + .00001f;
+  }
   float clearance(Pose pose, float angle, Vec *point = nullptr) const {
     // A cheap conservative bound for tools nowhere near the housing.
     float broad =
@@ -157,8 +166,11 @@ struct ToolShape {
       return broad;
     float result = 1e9f;
     auto rotation = axisAngle({0, 0, 1}, angle * pi / 180);
+    const float front = frontLimit();
     for (size_t n = 0; n < count; n++) {
       Vec p = world(pose, balls[n].p);
+      if (p.z > front && p.z - front - balls[n].r >= result)
+        continue;
       float d = distance(p, rotation) - balls[n].r;
       if (d < result) {
         result = d;
@@ -195,10 +207,14 @@ inline HousingContact sweepHousing(const ToolShape &shape, Pose from, Pose to,
   Pose p = from;
   auto rotation = axisAngle({0, 0, 1}, angle * pi / 180);
   float t = 0;
+  const float front = shape.frontLimit();
   for (int n = 0; n < 64; n++) {
     float advance = 1 - t;
     for (size_t j = 0; j < shape.count; j++) {
       Vec point = world(p, shape.balls[j].p);
+      const float planeGap = point.z - front - shape.balls[j].r;
+      if (planeGap >= .000005f && .8f * planeGap > speed[j] * advance)
+        continue;
       float d = shape.distance(point, rotation) - shape.balls[j].r;
       // Use each wire sample's own motion bound. A nearly stationary shaft
       // beside the keyway must not throttle the distant, freely moving grip.
@@ -221,12 +237,7 @@ inline HousingContact moveAgainstHousing(const ToolShape &shape, Pose from,
                                          Pose to, float angle = 0) {
   // The tip translates linearly, and reach encloses every ball at all rotations.
   // A sweep wholly in front of all solid geometry cannot touch it.
-  float front = std::max({plugFaceZ, safeFront, padFront, shackleRadius,
-                          stapleRadius + stapleWire, mouth(1, shape.target.style).z - driverBearingDepth});
-  if (shape.target.enabled)
-    front = std::max(front, shape.target.high.z);
-  if (shape.target.panel) front=std::max(front,shape.target.panel->highest);
-  if (std::min(from.p.z, to.p.z) - shape.reach > front + .00001f)
+  if (std::min(from.p.z, to.p.z) - shape.reach > shape.frontLimit())
     return {to, false, {}};
   // Withdrawals and a changed bend can begin with slight overlap. Push out
   // before sweeping; never let an embedded start bypass the collision test.

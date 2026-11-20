@@ -340,7 +340,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 91;  // Beta 0.2, revision 5.
+  p->version = 92;  // Beta 0.2, revision 6.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -353,7 +353,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=91 release=\"Beta 0.2\" build=closeup-world-lighting", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=92 release=\"Beta 0.2\" build=gate-padlocks-safe-timing", n->runtime);
   const DWORD iniStatus = EnsureDefaultSettings(folder);
   if (iniStatus == ERROR_SUCCESS)
     Log("settings_created file=TTWVRPhysicalLockpicking.ini");

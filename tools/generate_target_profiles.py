@@ -15,10 +15,10 @@ def generate(profiles):
         if len(p['anchor'])!=3 or not all(math.isfinite(v) for v in p['anchor']) or not 0<p['scale']<=.1:raise ValueError('Invalid mount transform')
         if 'reverse_anchor' in p:
             back = p['reverse_anchor']
-            if (p.get('category','DOOR') != 'DOOR' or p.get('lock_style',0) != 0
+            if (p.get('category','DOOR') != 'DOOR' or p.get('lock_style',0) not in (0,1)
                     or len(back) != 3 or not all(math.isfinite(v) for v in back)
                     or back == p['anchor']):
-                raise ValueError('Invalid reverse door cylinder')
+                raise ValueError('Invalid reverse door mount')
     if not 1<=len(profiles)<=128:raise ValueError('Catalogue exceeds bounded capacity')
     return '// SPDX-License-Identifier: GPL-3.0-only\n// Generated from tools/target_profiles.json by tools/generate_target_profiles.py.\n#pragma once\nnamespace locks {\nstruct TargetProfile { const char *path; unsigned style; };\ninline constexpr TargetProfile targetProfiles[]{\n'+''.join('  {'+json.dumps(p['model'].replace('/','\\'))+', '+str(p.get('lock_style',0))+'},\n' for p in profiles)+'};\ninline constexpr unsigned targetKinds = sizeof(targetProfiles)/sizeof(targetProfiles[0]);\n} // namespace locks\n'
 

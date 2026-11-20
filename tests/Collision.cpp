@@ -11,6 +11,33 @@ int main() {
   assert(housingDistance({0, 0, 0}) > 0);      // actual opening
   assert(housingDistance({0, 0, -.060f}) > 0); // no invisible backplate
   assert(housingDistance({.10f, .10f, 0}) > 0);
+  // A protruding mount or an adjusted internal bearing can be the first
+  // point of contact. Compare the fast clearance against every tool sample.
+  MountSurfaceGrid panel{};
+  panel.depths.fill(8500);
+  panel.measureHeight();
+  for (auto style : {LockStyle::Round, LockStyle::Padlock, LockStyle::RoundedSafe}) {
+    TargetBounds target;
+    target.style = style;
+    for (auto grid : {static_cast<const MountSurfaceGrid *>(nullptr),
+                      static_cast<const MountSurfaceGrid *>(&panel)}) {
+      target.panel = grid;
+      for (int k : {0, 1}) {
+        ToolShape shape(k, .9f, .3f, target);
+        shape.driverStopZ = .031f;
+        for (float z : {-.025f, .015f, .055f, .12f}) {
+          Pose pose{axisAngle({1, 0, 0}, .2f), {.008f, -.006f, z}};
+          float exact = 1e9f;
+          for (size_t i = 0; i < shape.count; ++i) {
+            const auto &ball = shape.balls[i];
+            exact = std::min(exact, shape.distance(world(pose, ball.p), 31.f) - ball.r);
+          }
+          Vec closest;
+          assert(shape.clearance(pose, 31.f, &closest) == exact);
+        }
+      }
+    }
+  }
   for (int k = 0; k < 2; k++) {
     ToolShape shape(k);
     assert(shape.count < shape.balls.size());

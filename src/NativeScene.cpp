@@ -181,6 +181,7 @@ void registerWorkspaceLighting(bool add) {
 }
 
 void releaseScene() {
+  const auto start = root ? GetTickCount64() : 0;
   presented = 0;
   if (root && object(root)) {
     hide(root, true);
@@ -218,10 +219,10 @@ void releaseScene() {
       reinterpret_cast<Up>(read<Ptr>(read<Ptr>(parent) + 0xfc))((void *)parent);
       Log("native_scene_direct_detach target=%08x", ownerId);
     }
-    Log("native_scene_detached menu=%08x", unsigned(menu));
-  }
-  if (root)
     unref(root);
+    Log("native_scene_detached menu=%08x ref=%08x kind=%u detach_ms=%llu",
+        unsigned(menu), ownerId, kind, (unsigned long long)(GetTickCount64() - start));
+  }
   root = owner = menu = 0;
   ownerId = 0;
   batches.clear();
