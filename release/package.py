@@ -11,7 +11,7 @@ parser.add_argument("--output", type=Path, required=True)
 args = parser.parse_args()
 release = Path(__file__).resolve().parent
 root = release.parent
-source_extensions = {".cpp", ".h", ".cmake", ".py", ".json", ".txt"}
+source_extensions = {".cpp", ".h", ".cmake", ".in", ".py", ".json", ".txt"}
 with ZipFile(args.output, "x", compression=ZIP_DEFLATED, compresslevel=8) as archive:
     for name in ("README.md", "LICENSE", "docs/install-linux.md", "docs/install-windows.md",
                  "docs/help.md", "docs/advanced.md"):

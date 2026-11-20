@@ -1504,14 +1504,7 @@ void UpdateMenu(Session &s, const GameState &g) {
     s.openingTime = 0;
     s.bypassMenu = 0;
     s.triedExit = false;
-    s.interaction.config = {};
-    if (auto *file = _wfopen(
-            (folder + L"\\TTWVRPhysicalLockpicking.ini").c_str(), L"rb")) {
-      char text[8193]{};
-      auto count = fread(text, 1, sizeof(text) - 1, file);
-      fclose(file);
-      s.interaction.config.load(std::string(text, count));
-    }
+    s.interaction.config = LoadPlayerSettings(folder);
     if (s.backend) s.interaction.config.nativeScene = true;
     s.interaction.reset(g.pick);
     // The live wheel binding does not choose the close-up's tool source.

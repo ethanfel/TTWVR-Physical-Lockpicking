@@ -100,4 +100,6 @@ struct Ergonomics {
     }
   }
 };
+Ergonomics LoadPlayerSettings(const std::wstring &folder);
+unsigned long EnsureDefaultSettings(const std::wstring &folder);
 } // namespace locks

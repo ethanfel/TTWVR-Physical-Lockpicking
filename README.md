@@ -2,7 +2,7 @@
 
 Pick a door, safe or ammo box with both hands in VR. Draw the bobby pin and screwdriver from one holster, bend the pin, then feel the lock resist as you twist the screwdriver.
 
-**[Download the ready-to-play Beta 0.1 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/latest/download/TTWVR-Physical-Lockpicking-Beta-0.1-Ready-to-Play.zip)**
+**[Download the ready-to-play Beta 0.2 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.2/TTWVR-Physical-Lockpicking-Beta-0.2-Ready-to-Play.zip)**
 
 ## Install
 
@@ -22,7 +22,7 @@ The addon takes controller input and haptics from the backend TTWVR selects, inc
 2. Draw with either hand to take a pin. Bend it with both hands, then draw the screwdriver from the same holster with your free hand.
 3. Seat the pin in the keyhole. Insert the screwdriver alongside the pin and twist. On a door, turn clockwise if the lock is on your left and counterclockwise if it is on your right as you face the door. Centered locks and containers turn clockwise. If you feel resistance, ease off and adjust the pin. A replacement pin keeps the same sweet spot on that lock.
 
-A 45° wrist twist requests a full turn. Hold your wrist still to hold your progress, ease it back to reduce pressure, or pull the blade out to release it. To adjust sensitivity, edit `FullTurnWristDegrees` under `[Ergonomics]` in `NVSE/Plugins/TTWVRPhysicalLockpicking.ini`. For the previous sideways push in the lower slot, set `ScrewdriverMode=0`. Restart Fallout after changing the INI.
+A 45° wrist twist requests a full turn. Hold your wrist still to hold your progress, ease it back to reduce pressure, or pull the blade out to release it. To adjust sensitivity, edit `FullTurnWristDegrees` under `[Ergonomics]` in `NVSE/Plugins/TTWVRPhysicalLockpicking.ini`. For the previous sideways push in the lower slot, set `ScrewdriverMode=0`. Restart Fallout after changing the INI. To restore the defaults, close Fallout and delete the addon INI. The addon recreates it on the next launch.
 
 A picked door stays closed until you open it. Containers open on success. For the close-up interaction with the pin box and screwdriver tin, stow both tools and activate the lock. Press **B** on the right Touch controller to leave the close-up.
 

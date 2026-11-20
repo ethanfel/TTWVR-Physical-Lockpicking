@@ -490,10 +490,7 @@ end)");
 void InitWorldLocks(void *scripts, void *arrayInterface, void *commandTable) {
   commands = static_cast<CommandTable *>(commandTable);
   arrays = static_cast<Arrays *>(arrayInterface);
-  if (auto ini=_wfopen((folder+L"\\TTWVRPhysicalLockpicking.ini").c_str(),L"rb")) {
-    char data[8192]; auto count=fread(data,1,sizeof(data),ini); fclose(ini);
-    settings.load(std::string(data,count));
-  }
+  settings = LoadPlayerSettings(folder);
   model.physics.config=settings;
   api = (Scripts *)scripts;
   if (!api || !api->compile || !api->call)
