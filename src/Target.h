@@ -45,11 +45,11 @@ struct TargetAsset {
             p.p + (q.p - p.p) * t};
   }
 };
-inline bool readTarget(FILE *f, unsigned expected, TargetAsset &out) {
+inline bool readTargetHeader(FILE *f, unsigned expected, TargetAsset &a, uint32_t &parts, uint32_t &frames) {
   if (!f)
     return false;
   char magic[8];
-  uint32_t kind, parts, materials, frames;
+  uint32_t kind, materials;
   float duration;
   auto read = [&](void *p, size_t n) { return fread(p, 1, n, f) == n; };
   if (!read(magic, 8))
@@ -62,7 +62,6 @@ inline bool readTarget(FILE *f, unsigned expected, TargetAsset &out) {
       !read(&duration, 4) || !std::isfinite(duration) || duration < .05f ||
       duration > 10)
     return false;
-  TargetAsset a;
   a.kind = kind;
   a.materials = materials;
   a.duration = duration;
@@ -78,6 +77,13 @@ inline bool readTarget(FILE *f, unsigned expected, TargetAsset &out) {
       a.bounds.low.z >= a.bounds.high.z || a.bounds.high.z > -.005f)
     return false;
   a.bounds.enabled = true;
+  return true;
+}
+inline bool readTarget(FILE *f, unsigned expected, TargetAsset &out) {
+  TargetAsset a;
+  uint32_t parts, frames;
+  if (!readTargetHeader(f, expected, a, parts, frames)) return false;
+  auto read = [&](void *p, size_t n) { return fread(p, 1, n, f) == n; };
   a.animation.resize(frames);
   for (auto &p : a.animation) {
     if (!read(&p, sizeof(p)) || !finite(p.p) || length(p.p) > 5 ||
@@ -96,7 +102,7 @@ inline bool readTarget(FILE *f, unsigned expected, TargetAsset &out) {
     TargetPart p;
     uint32_t n, t;
     if (!read(&n, 4) || !n || n > 20000 || !read(&t, 4) || !t || t > 12000 ||
-        !read(&p.mesh.material, 4) || p.mesh.material >= materials ||
+        !read(&p.mesh.material, 4) || p.mesh.material >= a.materials ||
         !read(&p.moving, 4) || p.moving > 1 || !read(&p.alpha, 4) ||
         p.alpha > 1)
       return false;

@@ -41,7 +41,7 @@ struct MountedInteraction {
       // If tracking first appears behind the face, recover to the front.
       // The common swept solver owns all subsequent motion and contact.
       if (!c.sampled && facing) {
-        c.update(*raw[k], k != 0, opening, cylinder, physics.targetBounds.style,
+        c.update(*raw[k], k != 0, opening, physics.signedCylinder(cylinder), physics.targetBounds.style,
                  true, physics.targetBounds.panel);
         pose.p = c.shown;
       }

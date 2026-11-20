@@ -23,6 +23,7 @@ struct Scene {
   float pick = 90, cylinder = 0;
   unsigned targetKind = 0;
   float targetOpenTime = 0;
+  Pose targetFace{};
   bool engaged = false;
   bool pickHeld = false, pickNear = false, screwdriverNear = false;
   Ergonomics config;

@@ -1259,7 +1259,7 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
         "recovered=%u",
         p.pinContact.x, p.pinContact.y, p.pinContact.z, hand.x, hand.y, hand.z,
         p.owner >= 0 ? length(hand - grip) : 0.f,
-        pinPoseAngle(p.pose, g.cylinder), input.pick, g.cylinder,
+        pinPoseAngle(p.pose, input.signedCylinder(g.cylinder)), input.pick, g.cylinder,
         input.recovered & 1u);
   }
   if (input.rummagedHands && s.frames % 15 == 0)
@@ -1565,21 +1565,23 @@ bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
     Neutral();
     return false;
   }
+  s.interaction.doorTurnSign = g.doorTurn.sign;
   if (!s.positioned) {
     auto &config = s.interaction.config;
     s.lock =
         placeLock(headPose, config.lockDistance, config.lockBelowEyes);
     Log("lock_placement distance=%.3f below_eyes=%.3f driver=%s "
-        "holders=%d preparation=%d position=%.3f,%.3f,%.3f upright=1 yaw=%.5f",
+        "holders=%d preparation=%d position=%.3f,%.3f,%.3f upright=1 yaw=%.5f direction=%s",
         config.lockDistance, config.lockBelowEyes, driverModeName(config.driverMode),
         config.useHolders, config.requirePreparation, s.lock.p.x, s.lock.p.y,
-        s.lock.p.z, 2 * std::atan2(s.lock.q.y, s.lock.q.w));
+        s.lock.p.z, 2 * std::atan2(s.lock.q.y, s.lock.q.w),
+        s.interaction.signedCylinder(1) < 0 ? "counterclockwise" : "clockwise");
     s.positioned = true;
   }
   if(g.kitSlot && g.kitRadii[g.kitSlot-1]>0 && !s.interaction.config.useHolders &&
      !s.interaction.sharedKit)
     s.interaction.sharedKit=true;
-  scene = Scene{s.lock, s.interaction.pick, g.cylinder};
+  scene = Scene{s.lock, s.interaction.pick, s.interaction.signedCylinder(g.cylinder)};
   scene.targetKind = s.interaction.config.useTargetObject && !g.targetHasTextureSwap
                          ? g.targetKind : 0;
 #ifdef LOCKPICK_TEST_INPUT
@@ -1600,6 +1602,11 @@ bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
   const auto *object = s.renderer->Target(scene.targetKind);
   if (!object) scene.targetKind = 0; // use the prepared standalone template too
   s.interaction.targetBounds = object ? object->bounds : TargetBounds{};
+  if (object && scene.targetKind == g.targetKind && g.doorTurn.reverseFace &&
+      s.interaction.config.driverMode == DriverMode::AxialTwist) {
+    scene.targetFace = *g.doorTurn.reverseFace;
+    s.interaction.targetBounds = reverseDoorBounds(object->bounds, scene.targetFace);
+  }
   float openDt = s.openingTime ? float(double(time - s.openingTime) * 1e-9) : 0;
   s.openingTime = time;
   bool wasOpening = s.opening.opened;

@@ -76,6 +76,7 @@ int main() {
   // instead of carrying collision offsets from several completed turns.
   for (float target : {225.f, 90.f, -45.f, 90.f}) {
     PhysicalInteraction t;
+    t.config.driverMode = DriverMode::SidePush;
     t.targetBounds.style = style;
     t.config.useHolders = false;
     t.config.requirePreparation = false;

@@ -94,6 +94,7 @@ int main() {
     d.owner = 1;
     d.pose = d.seatPose = aimedTool({{}, {.07f, -.035f, .15f}}, mouth(1));
     Pose rest{d.pose.q, world(d.pose, handleCenter(1))};
+    t.config.driverMode = DriverMode::SidePush;
     d.leverStartHand = rest.p;
     d.driverTracking = true; d.driverTracked = rest;
     Pose hand = rest; hand.p = hand.p + Vec{.012f, -.002f, 0};

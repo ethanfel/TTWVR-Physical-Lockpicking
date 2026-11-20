@@ -24,7 +24,7 @@ struct PhysicalTool {
   Vec pinContact, lastRawTip;
   bool captureBlocked = false;
   Vec entryHand, entryAxis{0, 0, 1}, lastHand, seatHand;
-  float searchAngle = 0, leverStartCylinder = 0;
+  float searchAngle = 0, leverStartCylinder = 0, shaftTravel = 0;
   Vec leverStartHand;
   float opening = 0, bendYaw = 0;
   float referenceAngle = 90, seatedRadius = 0, insertProgress = 0;
@@ -109,13 +109,19 @@ class PhysicalInteraction {
       bool inReach = length(delta - axis * dot(delta, axis)) < .055f &&
                      dot(delta, axis) > -.065f;
       if (depth > 0 && inReach) {
-        if (!pin.inserted || !manipulating || (insertedEvents & 1u) || pull > .003f) {
+        if (!pin.inserted || !manipulating || (insertedEvents & 1u)) {
           tool.wristReference = hand.q;
-          tool.leverStartCylinder = cylinder;
+          tool.shaftTravel = 0;
+          tool.leverStartCylinder = std::abs(cylinder);
         } else {
           float angle = shaftTwist(tool.seatPose, tool.wristReference, hand.q);
+          // Unwrap across 180 degrees so turning further the wrong way cannot
+          // suddenly apply full torque. A stationary grip keeps its angle.
+          tool.shaftTravel += std::remainder(angle - tool.shaftTravel, 360.f);
           target = std::clamp(tool.leverStartCylinder +
-                              angle * (90.f / config.fullTurnWrist), 0.f, 90.f);
+                              signedCylinder(tool.shaftTravel) * (90.f / config.fullTurnWrist), 0.f, 90.f);
+          // Ease off only as the blade actually leaves the mouth.
+          target *= std::clamp(depth / .003f, 0.f, 1.f);
           if (target < 1.f) target = 0;
           if (target >= 89.99f) target = 90;
         }
@@ -159,7 +165,8 @@ class PhysicalInteraction {
                      turnWithCylinder({{}, tool.pose.p}, -cylinder).p};
     tool.wristReference = hand.q;
     tool.seatHand = hand.p;
-    tool.leverStartCylinder = cylinder;
+    tool.leverStartCylinder = std::abs(cylinder);
+    tool.shaftTravel = 0;
     insertedEvents |= 2u;
   }
 
@@ -253,6 +260,10 @@ public:
   Grab grabs[2];
   Pose dropOrigin;
   float cylinderAngle = 0;
+  int doorTurnSign = 1;
+  float signedCylinder(float angle) const {
+    return config.driverMode == DriverMode::AxialTwist ? angle * doorTurnSign : angle;
+  }
   int pickHand = -1, screwdriverHand = -1, bendHand = -1;
   Vec bendStartHelper, bendStartTip;
   unsigned preparedHands = 0;
@@ -297,11 +308,12 @@ public:
   }
   bool seated() const { return tools[0].inserted && tools[1].inserted; }
   void update(Pose lock, Pose left, Pose right, float lt, float rt,
-              float cylinder, float dt = 1.f / 90, unsigned stage = 2,
+              float progress, float dt = 1.f / 90, unsigned stage = 2,
               float health = 1, const Pose *pinches = nullptr, const MountedTools *mounted = nullptr) {
     dt = std::isfinite(dt) ? std::clamp(dt, 0.f, .05f) : 0;
     insertedEvents = withdrawnEvents = recovered = preparedHands =
         storedEvents = droppedEvents = housingHands = rummagedHands = 0;
+    const float cylinder = signedCylinder(progress);
     float cylinderDelta = cylinder - cylinderAngle;
     cylinderAngle = cylinder;
     if (initialized && tools[0].inserted && std::abs(cylinderDelta) > 1e-6f) {
@@ -378,6 +390,7 @@ public:
                                    : Quat{};
       Pose hand = handFor(best, h);
       t.wristReference = hand.q;
+      t.shaftTravel = 0;
       t.searchAngle = pinBearing(hand.p);
       t.referenceAngle = pick;
       t.velocity = t.angular = {};
@@ -393,7 +406,7 @@ public:
         t.entryAxis = normal(rotate(t.pose.q, pinHinge(t.opening, t.bendYaw)));
       if (best == 1 && t.inserted) {
         t.leverStartHand = hand.p;
-        t.leverStartCylinder = cylinder;
+        t.leverStartCylinder = progress;
       }
       if (!t.inserted)
         t.pose = held(hand, best, t.opening, t.bendYaw);
@@ -752,7 +765,7 @@ public:
       }
     }
     bool loadPin = seated() &&
-                   (target > .5f || cylinder > .5f || stage == 3 || stage == 4);
+                   (target > .5f || progress > .5f || stage == 3 || stage == 4);
     // The pin (and optional legacy driver) remains supported on release.
     // The free driver has no attached pose and falls as soon as it is released.
     for (int k = 0; k < 2; k++) {
@@ -945,9 +958,9 @@ public:
     // One animation sample per frame is shared by both rendered eyes. It is
     // never fed back to native pick angle or the interaction/collision poses.
     bool resisting = seated() && stage == 4 && driver.owner >= 0 &&
-                     target > .5f && target >= cylinder - .5f;
+                     target > .5f && target >= progress - .5f;
     pinResisting = resisting;
-    float pressure = std::clamp((target - cylinder) / 20, 0.f, 1.f);
+    float pressure = std::clamp((target - progress) / 20, 0.f, 1.f);
     strain += ((resisting ? .8f + 1.6f * pressure : 0) - strain) *
               std::min(1.f, dt * 30);
     if (!resisting && strain < .01f)

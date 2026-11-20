@@ -3,14 +3,20 @@
 #include "Math.h"
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <windows.h>
 namespace locks {
+struct DoorTurn {
+  int sign = 1;
+  std::optional<Pose> reverseFace;
+};
 struct GameState {
   uintptr_t menu = 0, target = 0;
   unsigned stage = 0, level = 0, skill = 0;
   float pick = 0, cylinder = 0, health = 0;
   int kitPinHand = -1;
+  DoorTurn doorTurn;
   unsigned kitSlot = 0, kitDrawn = 0, kitHands = 0;
   Vec kitCenters[8]{};
   float kitRadii[8]{};

@@ -13,6 +13,7 @@ int main() {
   // and pressing the same point again must produce a second impact.
   {
     PhysicalInteraction t;
+    t.config.driverMode = DriverMode::SidePush;
     t.config.useHolders=false;
     Pose other{{},{2,2,2}}, h{};
     auto step=[&](float hold){t.update({},h,other,hold,0,0);return bool(t.housingHands&1);};
@@ -32,7 +33,9 @@ int main() {
   }
   for (auto style:{LockStyle::Round,LockStyle::RoundedSafe,LockStyle::Padlock})
   for (int h=0;h<2;h++) {
-    PhysicalInteraction t;t.targetBounds.style=style;
+    PhysicalInteraction t;
+    t.config.driverMode = DriverMode::SidePush;
+    t.targetBounds.style=style;
     t.config.useHolders=false;t.config.requirePreparation=false;
     Pose hands[2];hands[1-h].p={2,2,2};
     auto step=[&](float hold,float cylinder=0,unsigned stage=2) {
@@ -132,7 +135,9 @@ int main() {
   // must still apply torque; the old legacy radius gate discarded it.
   for (auto style:{LockStyle::Round,LockStyle::RoundedSafe,LockStyle::Padlock})
   for (int h=0;h<2;h++) {
-    PhysicalInteraction t;t.targetBounds.style=style;
+    PhysicalInteraction t;
+    t.config.driverMode = DriverMode::SidePush;
+    t.targetBounds.style=style;
     t.config.useHolders=false;t.config.requirePreparation=false;
     Pose hands[2];hands[1-h].p={2,2,2};
     auto step=[&](float hold,float cylinder=0,unsigned stage=2) {
@@ -185,7 +190,9 @@ int main() {
   // possible, so a stopped lock cannot keep damaging the pin during the pull.
   for(auto style:{LockStyle::Round,LockStyle::RoundedSafe,LockStyle::Padlock})
   for(int h=0;h<2;h++) {
-    PhysicalInteraction t;t.targetBounds.style=style;
+    PhysicalInteraction t;
+    t.config.driverMode = DriverMode::SidePush;
+    t.targetBounds.style=style;
     t.config.useHolders=false;t.config.requirePreparation=false;
     Pose hands[2];hands[1-h].p={2,2,2};
     auto step=[&](float c,unsigned stage=2) {
@@ -235,6 +242,7 @@ int main() {
   // side stroke with a fixed wrist and check actual tip depth during the turn.
   {
     PhysicalInteraction session;
+    session.config.driverMode = DriverMode::SidePush;
     session.targetBounds.style = LockStyle::RoundedSafe;
     session.config.useHolders = false;
     session.config.requirePreparation = false;

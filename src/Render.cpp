@@ -137,7 +137,7 @@ Mesh mesh(const Scene &s, HandMesh (&hands)[2], const Props *props,
   m.object = 1000;
   if (target)
     for (const auto &part : target->parts)
-      m.prop(part.mesh, part.moving ? opening : Pose{},
+      m.prop(part.mesh, part.moving ? compose(s.targetFace, opening) : s.targetFace,
              float((part.alpha ? 20 : 10) + part.mesh.material));
   bool padlock = target && target->bounds.style == LockStyle::Padlock;
   bool safe = target && target->bounds.style == LockStyle::RoundedSafe;

@@ -209,6 +209,7 @@ int main() {
   for (int owner : {0,1}) {
     MountedInteraction mounted;
     PhysicalInteraction close;
+    close.config.driverMode = DriverMode::SidePush;
     close.config.useHolders=false;
     close.config.requirePreparation=false;
     mounted.physics.config=close.config;

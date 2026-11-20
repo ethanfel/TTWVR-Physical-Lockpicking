@@ -2,7 +2,7 @@
 #include "WorldLock.h"
 #include "MountedInteraction.h"
 #include "LockRules.h"
-#include "TargetProfiles.h"
+#include "Target.h"
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -75,6 +75,7 @@ struct Selection {
   unsigned id = 0, kind = 0, side = 0;
   bool attached = false;
   int level = 0;
+  bool door = false;
   ULONGLONG mountDeadline = 0;
   Ptr playerCell = 0;
 };
@@ -267,7 +268,7 @@ Mat basis(const Selection &s) {
   }
   return b;
 }
-struct Frame {
+struct MountFrame {
   Mat r;
   Vec origin;
   float factor;
@@ -280,12 +281,32 @@ struct Frame {
             turn.apply(t.up), t.scale * factor,    turn.apply(t.across)};
   }
 };
-Frame frame(const Selection &s) {
+MountFrame frame(const Selection &s) {
   const auto &m = mounts[s.kind - 1];
   auto w = read<Transform>((s.hardware ? s.hardware : s.root) + 0x68);
   return {mul(w.rotation, basis(s)),
           w.position + w.rotation.apply(m.anchors[s.side]) * w.scale,
           m.scale / std::max(.0001f, w.scale)};
+}
+int twistDirection(unsigned kind, unsigned side) {
+  const auto &m = mounts[kind-1];
+  static int directions[targetKinds][2]{};
+  auto &sign = directions[kind-1];
+  if (!sign[0]) {
+    sign[0] = sign[1] = 1;
+    auto path = folder + L"\\TTWVRPhysicalLockpicking\\target-" + std::to_wstring(kind) + L".bin";
+    if (auto *f = _wfopen(path.c_str(), L"rb")) {
+      TargetAsset target;
+      uint32_t parts, frames;
+      if (readTargetHeader(f, kind, target, parts, frames)) {
+        float reverseX = m.basis.transpose().apply(m.anchors[1] - m.anchors[0]).x * m.scale;
+        sign[0] = doorTwistDirection(target.bounds, false, 0);
+        sign[1] = doorTwistDirection(target.bounds, true, reverseX);
+      }
+      fclose(f);
+    }
+  }
+  return sign[side];
 }
 void plug(float angle,bool updatePlug=true) {
   if (!current(active) || !active.hardware ||
@@ -378,6 +399,7 @@ Selection nearest(Ptr cell, const LiveTool *wire, const LiveTool *driver,
     if (!g.targetKind)
       return;
     Selection t{ref, rootOf(ref), 0, read<Ptr>(ref + 0x40), g.targetRefId, g.targetKind};
+    t.door = g.targetIsDoor;
     t.playerCell = cell;
     if (!t.root)
       return;
@@ -576,6 +598,20 @@ void TickVisibleLocks(Ptr closeupTarget) {
     it = visible.erase(it);
   }
 }
+DoorTurn CloseupDoorTurn(const GameState &g) {
+  DoorTurn turn;
+  if (!ready || !g.targetIsDoor || !g.targetKind) return turn;
+  Selection s{g.target, rootOf(g.target), 0, 0, g.targetRefId, g.targetKind};
+  Vec eye;
+  if (!WorldEye(eye)) eye = read<Vec>(player() + 0x30);
+  const auto &m = mounts[s.kind-1];
+  if (s.root && m.reverse && frame(s).point(eye).z < -.013f) {
+    s.side = 1;
+    turn.reverseFace = reverseDoorPose(m.basis.transpose().apply(m.anchors[1]-m.anchors[0]) * m.scale);
+  }
+  turn.sign = twistDirection(s.kind, s.side);
+  return turn;
+}
 uintptr_t WorldDriverMount() { return active.hardware; }
 bool HasParkedPin() { return parkedMesh != 0; }
 bool ParkLivePin(uintptr_t mesh) {
@@ -585,7 +621,7 @@ bool ParkLivePin(uintptr_t mesh) {
       !MountSceneChild(mesh, active.hardware)) return false;
   parkedMesh = mesh;
   parkedLocal = read<Transform>(mesh + 0x34);
-  parkedAngle = turn.cylinder;
+  parkedAngle = model.physics.signedCylinder(turn.cylinder);
   Log("live_pin_parked ref=%08x pick=%.1f", active.id, model.pick);
   return true;
 }
@@ -729,7 +765,7 @@ bool WorldLockFrame(GameState &g, const LiveTool *wire, const Transform *hand,
     clear(false);
     return false;
   }
-  Frame f = frame(active);
+  auto f = frame(active);
   // The game changes its animated wrist when contact or the grip button changes.
   // Once a tool approaches a mount, take motion from its tracked controller.
   // Keep the animated transform separately to fit the visible hand to the result.
@@ -748,6 +784,7 @@ bool WorldLockFrame(GameState &g, const LiveTool *wire, const Transform *hand,
   static const bool trace =
       GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE", nullptr, 0) > 0;
   static ULONGLONG nextTrace = 0;
+  model.physics.doorTurnSign = active.door ? twistDirection(active.kind, active.side) : 1;
   model.physics.targetBounds.style=LockStyle(mounts[active.kind-1].style);
   model.physics.targetBounds.panel=panelsReady ? &panels[active.kind-1][active.side] : nullptr;
   model.step(wire ? &w : nullptr,hand ? &d : nullptr,opening,twist,parkedMesh!=0,pinHand,
@@ -793,7 +830,7 @@ bool WorldLockFrame(GameState &g, const LiveTool *wire, const Transform *hand,
   }
   bool shake=parkedMesh && model.physics.pinResisting;
   if (turn.cylinder != previous || shake || parkedShaking)
-    plug(turn.cylinder,turn.cylinder != previous);
+    plug(model.physics.signedCylinder(turn.cylinder),turn.cylinder != previous);
   parkedShaking=shake;
   if (priorPin != model.pin || priorBlade != model.blade)
     Log("live_lock_contact ref=%08x pin=%d blade=%d pick=%.1f cylinder=%.1f",

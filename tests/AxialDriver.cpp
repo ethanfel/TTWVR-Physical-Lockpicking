@@ -4,12 +4,13 @@
 
 using namespace locks;
 
-static void trial(LockStyle style, int driverHand, bool centered) {
+static void trial(LockStyle style, int driverHand, bool centered, int sign) {
   MountedInteraction live;
   PhysicalInteraction close;
-  close.config.load("ScrewdriverMode=1\nUseToolHolders=0\nRequirePinPreparation=0\n");
+  close.config.load("UseToolHolders=0\nRequirePinPreparation=0\n");
   live.physics.config = close.config;
   close.targetBounds.style = live.physics.targetBounds.style = style;
+  close.doorTurnSign = live.physics.doorTurnSign = sign;
   const int pinHand = 1 - driverHand;
   Pose hands[2];
   hands[pinHand].p = {1, 1, 1};
@@ -66,14 +67,25 @@ static void trial(LockStyle style, int driverHand, bool centered) {
   blade.p.x -= .012f;
   blade.q = axisAngle({1,0,0}, .16f); step();
   assert(close.target == 0);
-  blade.q = axisAngle({0,0,1}, -20*pi/180); step();
+  // Wrong-way rotation, even beyond quaternion wrap, cannot open this door.
+  for (int angle : {25, 90, 175, 185, 220, 175, 90, 25, 0}) {
+    blade.q = axisAngle({0,0,1}, sign*angle*pi/180); step();
+    assert(close.target == 0);
+  }
+  blade.q = axisAngle({0,0,1}, -sign*22.5f*pi/180); step();
   assert(std::abs(close.target - 45) < .01f);
-  step(22,4);
+  // A stationary wrist with a few mm of tracking drift holds its progress.
+  const float depth = blade.p.z;
+  for (int i=0; i<60; ++i) {
+    blade.p.z = depth + .005f + .0003f*std::sin(float(i));
+    step(45,3); assert(std::abs(close.target-45) < .01f);
+  }
+  blade.p.z = depth; step(22,4);
   assert(close.pinResisting && live.physics.pinResisting);
-  assert(std::abs(wristRoll({},driver.pose.q) - 22) < .01f);
-  assert(length(driver.pose.p - turnWithCylinder({{},seated},22).p) < .0001f);
+  assert(std::abs(wristRoll({},driver.pose.q) - sign*22) < .01f);
+  assert(length(driver.pose.p - turnWithCylinder({{},seated},sign*22).p) < .0001f);
   blade.q = {}; step(0); assert(close.target == 0);
-  blade.q = axisAngle({0,0,1}, -40*pi/180); step();
+  blade.q = axisAngle({0,0,1}, -sign*45*pi/180); step();
   assert(close.target == 90);
   for(int a = 0; a <= 90; a += 3) {
     step(float(a),3);
@@ -108,11 +120,31 @@ static void trial(LockStyle style, int driverHand, bool centered) {
 
 int main() {
   Ergonomics cfg;
-  assert(cfg.driverMode == DriverMode::SidePush);
+  assert(cfg.driverMode == DriverMode::AxialTwist && cfg.fullTurnWrist == 45);
+  TargetBounds door;
+  door.enabled = true;
+  door.low.x = -.2f; door.high.x = 1.2f;
+  assert(doorTwistDirection(door,false,0) == 1 && doorTwistDirection(door,true,0) == -1);
+  assert(doorTwistDirection(door,true,.9f) == 1); // opposite face has its own anchor
+  door.low.y=-.8f; door.high.y=1.2f;
+  door.low.z=-.12f; door.high.z=-.013f;
+  Vec delta{.03f,.04f,-.09f};
+  Pose reverse = reverseDoorPose(delta);
+  Vec surface{0,0,-.013f};
+  assert(length(world(reverse, surface+delta)-surface) < .00001f);
+  auto back = reverseDoorBounds(door,reverse);
+  assert(back.low.x < -1.1f && back.high.x < .25f && back.low.y < back.high.y &&
+         back.low.z < back.high.z && back.high.z < 0);
+  assert(doorTwistDirection(back,false,0) == doorTwistDirection(door,true,delta.x));
+  door.low.x = -1.2f; door.high.x = .2f;
+  assert(doorTwistDirection(door,false,0) == -1 && doorTwistDirection(door,true,0) == 1);
+  door.low.x = -.2f;
+  assert(doorTwistDirection(door,false,0) == 1 && doorTwistDirection(door,true,0) == 1);
   cfg.load("FreeScrewdriver=0"); assert(cfg.driverMode == DriverMode::SeatedLever);
   cfg.load("FreeScrewdriver=0\nScrewdriverMode=1"); assert(cfg.driverMode == DriverMode::AxialTwist);
   cfg.load("ScrewdriverMode=0\nFreeScrewdriver=0"); assert(cfg.driverMode == DriverMode::SidePush);
   for (auto style : {LockStyle::Round, LockStyle::Padlock, LockStyle::RoundedSafe})
     for (int hand : {0,1})
-      for (bool centered : {false, true}) trial(style, hand, centered);
+      for (bool centered : {false, true})
+        for (int sign : {1,-1}) trial(style, hand, centered, sign);
 }

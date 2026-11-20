@@ -99,6 +99,7 @@ int main() {
     hands[h]=grasp(p.pose,1);p.seatHand=hands[h].p;p.seatDepth=p.pinDepth;
     d.inserted=true;d.holstered=false;d.owner=1-h;d.pose=aimedTool(hands[1-h],mouth(1));
     hands[1-h]={d.pose.q,world(d.pose,handleCenter(1))};
+    t.config.driverMode=DriverMode::SidePush;
     d.driverTracking=true;d.driverTracked=hands[1-h];
     d.seatedRadius=length(hands[1-h].p-mouth(1));
     t.grabs[0].held=t.grabs[1].held=true;

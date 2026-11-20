@@ -14,14 +14,14 @@ inline const char *driverModeName(DriverMode mode) {
 }
 struct Ergonomics {
   float lockDistance = .42f, lockBelowEyes = .42f;
-  float fullTurnWrist = 40.f; // Physical wrist travel for a full axial turn
+  float fullTurnWrist = 45.f; // Physical wrist travel for a full axial turn
   float pinSearchDegrees = 270.f;
   bool nativeScene = false;
   bool useTargetObject = true;
   bool useGameProps = true, useGameBackground = true;
   float backgroundBlur = 12.f, backgroundBrightness = .35f;
   bool requirePreparation = true, useHolders = true, dropPins = true;
-  DriverMode driverMode = DriverMode::SidePush;
+  DriverMode driverMode = DriverMode::AxialTwist;
   float holderSide[2]{-.22f, .22f}, holderBelowEyes[2]{.60f, .60f},
       holderForward[2]{.16f, .16f};
   float handConstraint = .035f, handAngle = 20.f;

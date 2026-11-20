@@ -99,7 +99,9 @@ int main() {
   assert(length(mouth(1,pad.style)-mouth(1,LockStyle::Round))==0);
   for(int owner:{0,1}) for(float depth:{.015f,.04f,.067f})
     for(Vec entry:{Vec{0,.0027f,.026f},Vec{-.002f,.007f,.026f},Vec{.002f,.012f,.026f}}) {
-      PhysicalInteraction state;state.targetBounds=pad;state.config.useHolders=false;
+      PhysicalInteraction state;
+      state.config.driverMode = DriverMode::SidePush;
+      state.targetBounds=pad;state.config.useHolders=false;
       Pose hand[2]; hand[0].p=hand[1].p={2,2,2};float hold[2]{};
       auto step=[&](float cylinder=0.f){state.update({},hand[0],hand[1],hold[0],hold[1],cylinder);};
       step();auto &pin=state.tools[0];auto &driver=state.tools[1];pin.opening=1;

@@ -9,6 +9,7 @@ bool IsWorldUnlockPending(uintptr_t ref);
 bool CompleteWorldLock(const GameState &);
 void InitWorldLocks(void *scripts, void *arrays, void *commands);
 void TickVisibleLocks(uintptr_t closeupTarget);
+DoorTurn CloseupDoorTurn(const GameState &);
 bool ParkLivePin(uintptr_t mesh);
 bool HasParkedPin();
 uintptr_t WorldDriverMount();

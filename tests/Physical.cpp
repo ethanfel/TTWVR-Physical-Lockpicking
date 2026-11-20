@@ -77,7 +77,7 @@ int main() {
       }
     }
   // Preserve explicit regression coverage for the optional legacy attachment.
-  // FreeDriver.cpp covers the default contact-only mode, including full turns.
+  // FreeDriver.cpp covers the optional side-push mode, including full turns.
   for (int swap = 0; swap < 2; swap++) {
     PhysicalInteraction i;
     i.config.driverMode = DriverMode::SeatedLever;

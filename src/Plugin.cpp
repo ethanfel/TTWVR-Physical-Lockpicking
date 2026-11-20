@@ -294,6 +294,16 @@ void __cdecl OnMessage(Message *m) {
   }
   if (DismissLockMenu(next)) return;
   UpdateTarget(next);
+  // Latch the approached face for the attempt. Leaning through the close-up
+  // or moving the camera cannot change which way the lock opens.
+  static uintptr_t directionMenu = 0, directionTarget = 0;
+  static DoorTurn doorTurn;
+  if (next.menu != directionMenu || next.target != directionTarget) {
+    doorTurn = CloseupDoorTurn(next);
+    directionMenu = next.menu;
+    directionTarget = next.target;
+  }
+  next.doorTurn = doorTurn;
   UpdateInventory(next);
   TickKit(next);
   TickVisibleLocks(next.target);
@@ -329,7 +339,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 84;  // Beta 0.1, revision 10.
+  p->version = 85;  // Beta 0.1, revision 11.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -342,7 +352,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=84 release=\"Beta 0.1\" build=axial-driver-option", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=85 release=\"Beta 0.1\" build=directional-wrist-twist", n->runtime);
   InitMotionShaders();
   InitInventory(n->query(6));
   InitKit(n->query(6));
