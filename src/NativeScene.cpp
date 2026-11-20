@@ -55,6 +55,8 @@ struct Batch {
   std::vector<SceneVertex> previous;
   LocalVertices localVertices;
   Vec handLight{};
+  Ptr material = 0;
+  Vec originalEmission{};
 };
 std::map<unsigned, Batch> batches;
 bool object(Ptr p) {
@@ -108,6 +110,60 @@ void hide(Ptr node, bool value) {
     f = (f & ~1u) | (value ? 1u : 0u);
   }
 }
+// Workspace NIFs declare a separate NiMaterialProperty on each LP mesh.
+// Only touch explicitly attached materials; inherited scene materials can
+// also belong to ordinary world objects.
+Ptr ownMaterial(Ptr mesh) {
+  Ptr material = read<Ptr>(mesh + 0xa4);
+  if (!Readable((void *)material, 0x44)) return 0;
+  Ptr link = read<Ptr>(mesh + 0x24);
+  for (unsigned i = 0; link && i < 16; ++i, link = read<Ptr>(link)) {
+    if (read<Ptr>(link + 8) == material) return material;
+  }
+  return 0;
+}
+
+void *sampleLight = nullptr;
+ULONGLONG nextLightSample = 0;
+float previousFill = -1.f;
+void updateCloseupLight(float minimum) {
+  if (minimum <= 0 || GetTickCount64() < nextLightSample) return;
+  nextLightSample = GetTickCount64() + 250;
+  if (!sampleLight)
+    sampleLight = scripts->compile(
+        "int posX\nint posY\nint posZ\nbegin Function {posX posY posZ}\n"
+        "SetFunctionValue (GetLightAmountAtPoint posX posY posZ)\nend\n");
+
+  const Vec face = workspaceWorld.position + workspaceWorld.rotation.apply({0, 0, .03f}) * units;
+  // In a paused menu a nearby point light can register on the room's light
+  // meter even when the renderer omits it from these newly attached meshes.
+  // JIP selects the cell by X/Y. Sample below the same cell, outside local
+  // light radii, for its ambient and directional contribution.
+  constexpr int belowLocalLights = 65536;
+  Element sample;
+  if (!sampleLight || !scripts->call(sampleLight, nullptr, nullptr, &sample, 3,
+        int(std::lround(face.x)), int(std::lround(face.y)), int(std::lround(face.z)) - belowLocalLights) ||
+      sample.type != 1 || !std::isfinite(sample.data.number)) {
+    Log("closeup_light unavailable=sample");
+    nextLightSample = ~ULONGLONG{0};
+    return;
+  }
+  const float deficit = std::max(0.f, minimum - float(sample.data.number));
+  if (deficit == previousFill) return;
+  // Scene lights still shade the materials normally. Texture and vertex
+  // occlusion modulate this additional low-light term, including the keyway.
+  for (const auto &[id, batch] : batches) {
+    if (!batch.material) continue;
+    const float weight = id >= 1000 ? .13f : (id == 210 || id == 211 ? .45f : 1.f);
+    const float lift = deficit * .018f * weight;
+    at<Vec>(batch.material + 0x28) = batch.originalEmission + Vec{lift, lift, lift};
+  }
+  if (previousFill < 0 || (previousFill > 0) != (deficit > 0))
+    Log("closeup_light ambient=%.1f minimum=%.1f fill=%.1f point=%.0f,%.0f,%.0f",
+        sample.data.number, minimum, deficit, face.x, face.y, face.z);
+  previousFill = deficit;
+}
+
 void releaseScene() {
   presented = 0;
   if (root && object(root))
@@ -117,6 +173,8 @@ void releaseScene() {
   // for the allocation size.
   for (const auto &entry : batches) {
     const auto &b = entry.second;
+    if (b.material && previousFill > 0)
+      at<Vec>(b.material + 0x28) = b.originalEmission;
     at<uint16_t>(b.data + 8) = uint16_t(b.capacity);
     at<uint16_t>(b.data + 0x40) = at<uint16_t>(b.data + 0x42) =
         uint16_t(b.capacity / 3);
@@ -148,6 +206,8 @@ void releaseScene() {
   root = owner = menu = 0;
   ownerId = 0;
   batches.clear();
+  previousFill = -1.f;
+  nextLightSample = 0;
   applied = 0;
 }
 bool prepare(const GameState &g, unsigned k) {
@@ -202,7 +262,12 @@ bool prepare(const GameState &g, unsigned k) {
     unsigned capacity = read<uint16_t>(d + 8);
     if (!Readable((void *)d, 0x58) || capacity < 3 || batches.count(id))
       return false;
-    batches[id] = {p, d, capacity, {}};
+    auto &batch = batches[id];
+    batch.node = p;
+    batch.data = d;
+    batch.capacity = capacity;
+    batch.material = ownMaterial(p);
+    if (batch.material) batch.originalEmission = read<Vec>(batch.material + 0x28);
     hide(p, true);
   }
   Log("native_scene_attached root=%08x target=%08x kind=%u batches=%u "
@@ -369,6 +434,7 @@ bool update(const Packet &p) {
     Log("native_scene_failure reason=unmapped_geometry");
     return false;
   }
+  updateCloseupLight(p.scene.config.minimumPuzzleLight);
   if (p.serial % 180 == 0)
     Log("native_scene_upload draws=%u uploads=%u cached=%u dynamic_vertices=%u relit=%u",
         unsigned(p.mesh.draws.size()), uploads, reused, unsigned(covered), relit);

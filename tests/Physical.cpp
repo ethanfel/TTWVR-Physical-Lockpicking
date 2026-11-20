@@ -21,6 +21,11 @@ int main() {
   assert(close(settings.fullTurnWrist, 20));
   assert(close(settings.insertRadius, .028f));
   assert(close(settings.withdrawTravel, .1f));
+  assert(close(settings.minimumPuzzleLight, 35)); // existing INIs
+  settings.load("MinimumPuzzleLight=0\n");
+  assert(close(settings.minimumPuzzleLight, 0));
+  settings.load("MinimumPuzzleLight=150\n");
+  assert(close(settings.minimumPuzzleLight, 100));
   for (int hand = 0; hand < 2; hand++) {
     PhysicalInteraction t;
     t.config.requirePreparation = false;
