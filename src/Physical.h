@@ -174,16 +174,20 @@ class PhysicalInteraction {
     auto &t = tools[k];
     Vec gravity = rotate(inverse(lock.q), {0, -9.81f, 0});
     int steps = std::max(1, int(std::ceil(dt * 180)));
-    if (k == 1 && config.useHolders &&
-        length(t.pose.p - holderPoint(config, 1)) < .4f)
-      steps = std::max(
-          steps, std::min(256, int(std::ceil(dt *
-                                             (length(t.velocity) + 9.81f * dt +
-                                              length(t.angular) * .2f) /
-                                             .002f))));
+    ToolShape shape(k, t.opening, t.bendYaw, targetBounds);
+    if (k == 1 && config.useHolders) {
+      // Only the thin tin wall needs the finer integration. The lock already
+      // has swept collision, even when the frame interval grows after a hitch.
+      const float linearTravel = dt * (length(t.velocity) + 9.81f * dt);
+      const float angle = dt * length(t.angular);
+      const float tipTravel = linearTravel + angle * length(toolCenter(1));
+      if (canDistance(t.pose.p - holderPoint(config, 1)) <= shape.reach + tipTravel) {
+        const float travel = linearTravel + angle * .2f;
+        steps = std::max(steps, std::min(256, int(std::ceil(travel / .002f))));
+      }
+    }
     t.blocked = false;
     float h = dt / steps;
-    ToolShape shape(k, t.opening, t.bendYaw, targetBounds);
     for (int s = 0; s < steps; s++) {
       Pose desired = t.pose;
       Vec center = world(t.pose, toolCenter(k, t.opening, t.bendYaw));

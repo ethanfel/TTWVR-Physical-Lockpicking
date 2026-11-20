@@ -118,7 +118,45 @@ static void trial(LockStyle style, int driverHand, bool centered, int sign) {
   assert(!driver.inserted && close.target == 0 && close.withdrawnEvents == 2);
 }
 
+// Ammo-box close-up, after the plug returned to zero around a tilted blade.
+static void wedgedBlade(bool held) {
+  PhysicalInteraction sim;
+  sim.targetBounds.style = LockStyle::Padlock;
+  sim.targetBounds.enabled = true;
+  sim.targetBounds.low = {-.25f, -.25f, -.25f};
+  sim.targetBounds.high = {.25f, .25f, -.013f};
+  sim.update({}, {}, {}, 0, 0, 0);
+  auto &pin = sim.tools[0];
+  pin.visible = pin.inserted = true;
+  pin.holstered = false;
+  pin.opening = .940f;
+  pin.bendYaw = 1.378f;
+  pin.pose = {unit({.25025f, -.51490f, .54550f, .61211f}), {.00826f, -.00778f, -.03988f}};
+  pin.seatPose = pin.pose;
+  pin.pinDepth = .0707f;
+
+  auto &driver = sim.tools[1];
+  driver.pose = {unit({.22841f, -.04475f, .54769f, -.80366f}), {-.00114f, -.01411f, .01900f}};
+  driver.holstered = false;
+  driver.owner = held ? 1 : -1;
+  driver.velocity = {0, -1.22f, 0};
+  Pose requested = driver.pose;
+  requested.p.z += .12f;
+  Pose hand{requested.q, world(requested, handleCenter(1))};
+  ToolShape blade(1, 1, 0, sim.targetBounds);
+  assert(blade.clearance(driver.pose, 0) < -.0001f);
+  for (int frame = 0; frame < 12; ++frame) {
+    sim.update({}, {}, hand, 0, held ? 1 : 0, 0, .05f);
+    assert(!driver.inserted && pin.inserted && sim.target == 0);
+    assert(blade.clearance(driver.pose, 0) >= 0);
+    if (held) assert(length(driver.pose.p - requested.p) < .0001f);
+  }
+  if (!held) assert(length(driver.velocity) < .15f);
+}
+
 int main() {
+  wedgedBlade(true);
+  wedgedBlade(false);
   Ergonomics cfg;
   assert(cfg.driverMode == DriverMode::AxialTwist && cfg.fullTurnWrist == 45);
   TargetBounds door;

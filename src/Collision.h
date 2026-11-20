@@ -230,12 +230,37 @@ inline HousingContact moveAgainstHousing(const ToolShape &shape, Pose from,
     return {to, false, {}};
   // Withdrawals and a changed bend can begin with slight overlap. Push out
   // before sweeping; never let an embedded start bypass the collision test.
+  Vec previousNormal{};
   for (int n = 0; n < 16; n++) {
     Vec point;
     float d = shape.clearance(from, angle, &point);
     if (d >= .000005f)
       break;
-    from.p = from.p + shape.normalAt(point, angle) * (.0003f - d);
+    Vec normal = shape.normalAt(point, angle);
+    // When the plug springs back around a withdrawn blade, opposite slot
+    // walls can alternately push the blade into each other. Find the first
+    // clear depth toward the mouth, keeping the blade's lateral pose and roll.
+    if (shape.driver && dot(normal, previousNormal) < -.9f &&
+        std::abs(normal.z) < .25f && std::hypot(point.x, point.y) < plugRadius(shape.target.style) &&
+        point.z >= -.001f && point.z <= plugFaceZ + .001f && rotate(from.q, {0, 0, 1}).z > .5f) {
+      Pose outside = from;
+      outside.p.z += std::max(0.f, plugFaceZ + .005f - point.z);
+      if (shape.clearance(outside, angle) >= .00005f) {
+        float inside = from.p.z;
+        for (int step = 0; step < 9; ++step) {
+          Pose middle = outside;
+          middle.p.z = (inside + outside.p.z) * .5f;
+          if (shape.clearance(middle, angle) >= .00005f)
+            outside = middle;
+          else
+            inside = middle.p.z;
+        }
+        from = outside;
+        break;
+      }
+    }
+    from.p = from.p + normal * (.0003f - d);
+    previousNormal = normal;
   }
   auto result = sweepHousing(shape, from, to, angle);
   if (!result.hit)
