@@ -299,12 +299,15 @@ void __cdecl OnMessage(Message *m) {
   // or moving the camera cannot change which way the lock opens.
   static uintptr_t directionMenu = 0, directionTarget = 0;
   static DoorTurn doorTurn;
+  static std::optional<std::bitset<128>> hiddenParts;
   if (next.menu != directionMenu || next.target != directionTarget) {
     doorTurn = CloseupDoorTurn(next);
+    hiddenParts = CloseupHiddenParts(next);
     directionMenu = next.menu;
     directionTarget = next.target;
   }
   next.doorTurn = doorTurn;
+  next.closeupHiddenParts = hiddenParts;
   UpdateInventory(next);
   TickKit(next);
   TickVisibleLocks(next.target);
@@ -340,7 +343,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 95;  // Beta 0.2, revision 9.
+  p->version = 96;  // Beta 0.2, revision 10.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -353,7 +356,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=95 release=\"Beta 0.2\" build=driver-attachment", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=96 release=\"Beta 0.2\" build=closeup-door-variants", n->runtime);
   const DWORD iniStatus = EnsureDefaultSettings(folder);
   if (iniStatus == ERROR_SUCCESS)
     Log("settings_created file=TTWVRPhysicalLockpicking.ini");

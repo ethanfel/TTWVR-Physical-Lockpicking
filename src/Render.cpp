@@ -134,11 +134,15 @@ Mesh mesh(const Scene &s, HandMesh (&hands)[2], const Props *props,
   Vec brass{.48f, .27f, .075f}, steel{.44f, .5f, .52f};
   float openTime = targetPresentationTime(s.config.nativeScene, s.targetOpenTime);
   Pose opening = target ? target->Motion(openTime) : Pose{};
-  m.object = 1000;
   if (target)
-    for (const auto &part : target->parts)
+    for (size_t i = 0; i < target->parts.size(); ++i) {
+      if (s.hiddenTargetParts[i]) continue;
+      // Workspace batch numbers correspond to source parts, including hidden ones.
+      m.object = 1000 + unsigned(i);
+      const auto &part = target->parts[i];
       m.prop(part.mesh, part.moving ? compose(s.targetFace, opening) : s.targetFace,
              float((part.alpha ? 20 : 10) + part.mesh.material));
+    }
   bool padlock = target && target->bounds.style == LockStyle::Padlock;
   bool safe = target && target->bounds.style == LockStyle::RoundedSafe;
   size_t lockBegin = m.v.size(), lockDrawBegin = m.draws.size();

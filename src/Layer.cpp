@@ -1583,8 +1583,10 @@ bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
      !s.interaction.sharedKit)
     s.interaction.sharedKit=true;
   scene = Scene{s.lock, s.interaction.pick, s.interaction.signedCylinder(g.cylinder)};
-  scene.targetKind = s.interaction.config.useTargetObject && !g.targetHasTextureSwap
-                         ? g.targetKind : 0;
+  if (s.interaction.config.useTargetObject && g.closeupHiddenParts) {
+    scene.targetKind = g.targetKind;
+    scene.hiddenTargetParts = *g.closeupHiddenParts;
+  }
 #ifdef LOCKPICK_TEST_INPUT
   float previewTime = -1;
   if (auto *file =
@@ -1594,6 +1596,7 @@ bool PrepareScene(Session &s, XrTime time, const GameState &g, Scene &scene,
     if (fscanf(file, "%u %f", &kind, &t) == 2 && kind <= targetKinds &&
         std::isfinite(t)) {
       scene.targetKind = kind;
+      scene.hiddenTargetParts.reset();
       previewTime = std::clamp(t, 0.f, 10.f);
     }
     fclose(file);

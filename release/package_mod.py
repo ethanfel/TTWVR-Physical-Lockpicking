@@ -14,6 +14,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from prepare_native_scene import N, game_materials
+from prepare_targets import target_part_table
 from shader_delta import build as shader_delta
 
 
@@ -78,6 +79,8 @@ def main():
                 z.writestr((assets/'motion'/(path.name+'.delta')).relative_to(base).as_posix(),delta)
             for name in ['hands','props','kit-pinch','kit-world','kit-surfaces',*[f'target-{k}' for k in sorted(kinds)]]:
                 add(assets/(name+'.bin'))
+            models = json.loads((assets/'targets-source.json').read_text())['models']
+            z.writestr((assets/'target-parts.tsv').relative_to(base).as_posix(), target_part_table(models))
             for k in sorted({0,*kinds}):
                 add(tmp/meshes/f'workspace-{k}.nif', meshes/f'workspace-{k}.nif')
             for name in [*[f'kit-{h}-{t}' for h in (0,1) for t in (0,1)],*[f'world-lock-{k}' for k in sorted(kinds)]]:

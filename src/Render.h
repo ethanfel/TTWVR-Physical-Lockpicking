@@ -10,6 +10,7 @@
 #include "Video.h"
 #include <d3d11.h>
 #include <openxr.h>
+#include <bitset>
 #include <map>
 #include <memory>
 #include <vector>
@@ -22,6 +23,7 @@ struct Scene {
   Pose lock;
   float pick = 90, cylinder = 0;
   unsigned targetKind = 0;
+  std::bitset<128> hiddenTargetParts{};
   float targetOpenTime = 0;
   Pose targetFace{};
   bool engaged = false;

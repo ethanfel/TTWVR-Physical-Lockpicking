@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "Math.h"
+#include <bitset>
 #include <cstdint>
 #include <mutex>
 #include <optional>
@@ -33,7 +34,9 @@ struct GameState {
   float worldUnitsPerMeter=70.f;
   unsigned kitBendNear = 0, kitRegrabNear = 0;
   int pinCount = -1;
-  bool inventoryReady = false, targetIsDoor = false, targetHasTextureSwap = false;
+  bool inventoryReady = false, targetIsDoor = false;
+  uintptr_t targetTextureSwaps = 0;
+  std::optional<std::bitset<128>> closeupHiddenParts;
   unsigned targetKind = 0, targetRefId = 0, targetBaseId = 0;
 };
 struct Control {
@@ -73,6 +76,7 @@ bool Readable(const void *, size_t);
 void InitInventory(void *scriptInterface);
 void UpdateInventory(GameState &state);
 void UpdateTarget(GameState &state);
+std::optional<std::bitset<128>> CloseupHiddenParts(const GameState &state);
 uint64_t RequestPinDrop(uintptr_t menu, uintptr_t target);
 bool PinDropResult(uint64_t id, bool &committed, int &remaining);
 GameState Snapshot();

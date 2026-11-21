@@ -22,6 +22,17 @@ def scalar(group,t):
                 return (2*u**3-3*u*u+1)*a.value+(u**3-2*u*u+u)*a.forward+(-2*u**3+3*u*u)*b.value+(u**3-u*u)*b.backward
             raise ValueError('Unsupported animation interpolation')
 
+def target_part_table(models):
+    rows = {}
+    for model in models:
+        names = [part['mesh'] for part in model['parts']]
+        if not 1 <= len(names) <= 128 or any(not n or not n.isascii() or
+                any(c in n for c in '\0\t\r\n') for n in names):
+            raise ValueError(f"Invalid source part names for {model['model']}")
+        # A duplicate block name cannot identify one geometry on the real reference.
+        rows[model['kind']] = '\t'.join(names) if len(set(names)) == len(names) else ''
+    return ''.join(rows.get(i, '') + '\n' for i in range(1, max(rows) + 1))
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--data',type=Path,required=True)
@@ -123,5 +134,6 @@ def main():
                 f.write(struct.pack('<5I',len(v),len(t),p['material'],p['moving'],p['alpha']));f.write(v.tobytes());f.write(t.tobytes())
         result=dict(**profile,triangles=sum(len(t) for _,_,t in parts),parts=[p for p,_,_ in parts],skipped=skipped,materials=materials,duration=duration,hinge=hinge.tolist(),hinge_axis=direction.tolist(),open_degrees=degrees,bounds=[low.tolist(),high.tolist()],mesh_bounds=[low.tolist(),mesh_high.tolist()])
         results.append(result);print('Prepared',profile['model'],result['triangles'],'triangles',result['open_degrees'],'degrees')
+    (a.output/'target-parts.tsv').write_bytes(target_part_table(results).encode('utf-8'))
     (a.output/'targets-source.json').write_text(json.dumps(dict(models=results,source_files=provenance),indent=2)+'\n')
 if __name__=='__main__':main()
