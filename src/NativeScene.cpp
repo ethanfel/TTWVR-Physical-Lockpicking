@@ -80,8 +80,16 @@ bool isNode(Ptr p) {
 }
 std::string name(Ptr p) {
   auto str = read<Ptr>(p + 8);
+  if (!str) return {};
+  const auto *begin = reinterpret_cast<const char *>(str);
+  constexpr unsigned limit = 96;
+  if (Readable(begin, limit)) {
+    const auto *end = static_cast<const char *>(std::memchr(begin, 0, limit));
+    return end ? std::string(begin, end) : std::string{};
+  }
+  // A short name may end just before a protection boundary.
   std::string s;
-  for (unsigned n = 0; n < 96; n++) {
+  for (unsigned n = 0; n < limit; n++) {
     char c = read<char>(str + n);
     if (!c)
       return s;
@@ -543,7 +551,11 @@ void RestoreWorldDriver() {
   auto d=driverMesh;
   driverMesh={};
   if (!d.part) return;
-  if (MountSceneChild(d.part,d.root)) {
+  if (read<Ptr>(d.part+0x18) == d.root) {
+    at<Transform>(d.part+0x34) = d.original;
+    UpdateSceneNode(d.part);
+    unref(d.part);
+  } else if (MountSceneChild(d.part,d.root)) {
     at<Transform>(d.part+0x34)=d.original;
     UpdateSceneNode(d.part);
     unref(d.part); // the temporary reference from the move back
@@ -552,24 +564,31 @@ void RestoreWorldDriver() {
   unref(d.root);
   unref(d.mount);
 }
-void PresentWorldDriver(Ptr rootNode,Ptr mount,const Transform &wrist) {
-  if (driverMesh.root!=rootNode || driverMesh.mount!=mount) RestoreWorldDriver();
-  if (!rootNode || !mount) return;
+bool PresentWorldDriver(Ptr hand, int handIndex, Ptr mount, const Transform &wrist) {
+  if (driverMesh.part && (driverMesh.mount != mount ||
+      read<Ptr>(driverMesh.root+0x18) != hand || read<Ptr>(driverMesh.part+0x18) != mount))
+    RestoreWorldDriver();
+  if (!hand || !mount) return false;
   if (!driverMesh.part) {
+    // The kit root stays directly under this wrist while its mesh is on the lock.
+    Ptr rootNode = FindSceneNode(hand, handIndex ? "TTWVRKit_1_1" : "TTWVRKit_0_1");
+    if (!rootNode || read<Ptr>(rootNode+0x18) != hand) return false;
     Ptr part=FindSceneNode(rootNode,"KitPart2");
-    if (!part || read<Ptr>(part+0x18)!=rootNode) return;
+    if (!part || read<Ptr>(part+0x18)!=rootNode) return false;
     auto original=read<Transform>(part+0x34);
-    if (!MountSceneChild(part,mount)) return;
+    if (!MountSceneChild(part,mount)) return false;
     retain(rootNode);
     retain(mount);
     driverMesh={rootNode,part,mount,original};
+    Log("live_driver_mesh_bound hand=%d", handIndex);
   }
   const auto &parent=at<Transform>(mount+0x68);
-  if (!(parent.scale>.0001f)) return;
-  const auto &rootLocal=at<Transform>(rootNode+0x34);
+  if (!(parent.scale>.0001f)) return false;
+  const auto &rootLocal=at<Transform>(driverMesh.root+0x34);
   Transform world=childWorld(childWorld(wrist,rootLocal),driverMesh.original);
   at<Transform>(driverMesh.part+0x34)=relativeTransform(world,parent);
   UpdateSceneNode(driverMesh.part);
+  return true;
 }
 void InitNativeScene(void *api) { scripts = static_cast<Scripts *>(api); }
 void NativeSceneCalibration(Pose rightEye) {

@@ -3,6 +3,7 @@
 #include "ArmContact.h"
 #include "ToolGeometry.h"
 #include "WorldLock.h"
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 
@@ -381,6 +382,9 @@ void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
     ResetWorldLock(false);
   driverOwner = driverHand;
   const bool driverDrawn = driverHand >= 0;
+  using Clock = std::chrono::steady_clock;
+  using Ms = std::chrono::duration<double, std::milli>;
+  const auto frameStart = driverDrawn ? Clock::now() : Clock::time_point{};
   loadFit();
   for (int h = 0; h < 2; ++h) {
     bindRig(h, hands[h]);
@@ -431,9 +435,13 @@ void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
     if (driver) {
       trackedDriver = *driver;
     }
+    const auto started = driver ? Clock::now() : Clock::time_point{};
     g.worldPinBroken =
         WorldLockFrame(g, wire, driver ? &trackedDriver : nullptr,
                        owner >= 0 ? owner : 1 - driverHand, opening, twist, pinHealth, corrections);
+    const auto solved = driver ? Clock::now() : Clock::time_point{};
+    bool mounted = false;
+    double meshMs = 0;
     for (int h=0;h<2;++h) {
       auto &c=corrections[h];
       Vec shift=h==owner && wire ? gripShift : Vec{};
@@ -444,12 +452,26 @@ void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
       auto tool=h==owner && wire ? pinRoot : uintptr_t{};
       if (h==driverHand) {
         auto mount=c.valid ? WorldDriverMount() : uintptr_t{};
-        auto root=mount ? FindSceneNode(hands[h],h ? "TTWVRKit_1_1" : "TTWVRKit_0_1") : 0;
-        if (root && wrist)
-          PresentWorldDriver(root,mount,{mul(c.turn,wrist->rotation),wrist->position+shift,wrist->scale});
+        const auto meshStart = mount ? Clock::now() : Clock::time_point{};
+        if (mount && wrist)
+          mounted = PresentWorldDriver(hands[h], h, mount,
+              {mul(c.turn, wrist->rotation), wrist->position + shift, wrist->scale});
         else RestoreWorldDriver();
+        if (mount) meshMs = Ms(Clock::now() - meshStart).count();
       }
       setContact(h,shift,c.turn,tool);
+    }
+    if (driver) {
+      const double prepMs = Ms(started - frameStart).count();
+      const double solverMs = Ms(solved - started).count();
+      const double armsMs = Ms(Clock::now() - solved).count() - meshMs;
+      static const bool trace = GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE", nullptr, 0) > 0;
+      static ULONGLONG nextReport = 0;
+      if ((trace || prepMs + solverMs + meshMs + armsMs >= 15) && GetTickCount64() >= nextReport) {
+        Log("live_driver_frame mounted=%d parked=%d prep_ms=%.3f lock_ms=%.3f mesh_ms=%.3f arms_ms=%.3f",
+            mounted, parked, prepMs, solverMs, meshMs, armsMs);
+        nextReport = GetTickCount64() + 1000;
+      }
     }
   };
   g.kitOpening = opening;

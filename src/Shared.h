@@ -60,7 +60,7 @@ bool MountSceneChild(uintptr_t node, uintptr_t parent);
 void RetainSceneNode(uintptr_t node);
 void ReleaseMountedChild(uintptr_t node);
 void RestoreWorldDriver();
-void PresentWorldDriver(uintptr_t root,uintptr_t mount,const Transform &wrist);
+bool PresentWorldDriver(uintptr_t hand, int handIndex, uintptr_t mount, const Transform &wrist);
 void UpdateSceneNode(uintptr_t node);
 struct NativeCall { uintptr_t site, target; void *replacement; };
 bool InstallVerifiedCalls(const NativeCall *, size_t count);
