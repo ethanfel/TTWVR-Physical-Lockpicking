@@ -105,10 +105,9 @@ class PhysicalInteraction {
       if (tool.owner < 0) return;
       float depth = plugFaceZ - tool.pose.p.z;
       tool.insertProgress = std::clamp(depth / seatDepth, 0.f, 1.f);
-      Vec delta = hand.p - tool.seatHand;
-      bool inReach = length(delta - axis * dot(delta, axis)) < .055f &&
-                     dot(delta, axis) > -.065f;
-      if (depth > 0 && inReach) {
+      // The slot supports the blade under sideways or inward pressure. Only
+      // a pull that takes the tip through the face ends this axial contact.
+      if (depth > 0) {
         if (!pin.inserted || !manipulating || (insertedEvents & 1u)) {
           tool.wristReference = hand.q;
           tool.shaftTravel = 0;

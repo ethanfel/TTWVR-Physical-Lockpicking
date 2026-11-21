@@ -62,9 +62,22 @@ static void trial(LockStyle style, int driverHand, bool centered, int sign) {
   blade.p.z = plugFaceZ - .015f; step();
   assert(driver.inserted && driver.owner == driverHand && close.insertedEvents == 2);
   const Vec seated = driver.pose.p;
-  blade.p.x += .012f; step();
-  assert(close.target == 0);
-  blade.p.x -= .012f;
+  // A player can lean on a seated blade while twisting against resistance.
+  // Neither lateral movement nor pressing into the stop withdraws the tip.
+  const Pose heldAtSeat = blade;
+  for (Vec offset : {Vec{.080f, 0, 0}, Vec{0, 0, -.080f}}) {
+    blade.p = heldAtSeat.p + offset;
+    step();
+    assert(driver.inserted && !close.withdrawnEvents && close.target == 0);
+    blade.q = axisAngle({0,0,1}, -sign*15*pi/180);
+    step(14, 4);
+    assert(driver.inserted && !close.withdrawnEvents && !close.insertedEvents);
+    assert(std::abs(close.target - 30.f) < .01f);
+    assert(length(driver.pose.p - turnWithCylinder({{},seated}, sign*14).p) < .0001f);
+    blade = heldAtSeat;
+    step();
+    assert(driver.inserted && !close.insertedEvents && close.target == 0);
+  }
   blade.q = axisAngle({1,0,0}, .16f); step();
   assert(close.target == 0);
   // Wrong-way rotation, even beyond quaternion wrap, cannot open this door.
@@ -116,6 +129,9 @@ static void trial(LockStyle style, int driverHand, bool centered, int sign) {
   assert(driver.inserted && close.target == 0 && driver.pose.p.z > seated.z+.006f);
   blade.p.z += .03f; step();
   assert(!driver.inserted && close.target == 0 && close.withdrawnEvents == 2);
+  blade.p.z = plugFaceZ + .002f; step();
+  blade.p.z = plugFaceZ - .015f; step();
+  assert(driver.inserted && close.insertedEvents == 2 && close.target == 0);
 }
 
 // Ammo-box close-up, after the plug returned to zero around a tilted blade.
