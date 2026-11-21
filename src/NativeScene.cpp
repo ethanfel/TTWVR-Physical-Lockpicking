@@ -3,6 +3,7 @@
 #include "GameTransform.h"
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -546,6 +547,22 @@ struct DriverMesh {
   Ptr root=0, part=0, mount=0;
   Transform original;
 } driverMesh;
+// AttachModel adds the kit to the wrist's child list. Its authored mesh is
+// also a direct child. Neither lookup needs to visit a finger or its bones.
+Ptr driverChild(Ptr parent, const char *wanted) {
+  if (!isNode(parent)) return 0;
+  auto children = read<const Ptr *>(parent + 0xa0);
+  const unsigned count = read<uint16_t>(parent + 0xa6);
+  if (!count || count > 2048 || !Readable(children, count * sizeof(Ptr))) return 0;
+
+  // Newly attached children usually occupy the last slot. Removed slots can be empty.
+  for (unsigned i = count; i > 0; --i) {
+    Ptr child = children[i - 1];
+    if (child && name(child) == wanted && object(child) && read<Ptr>(child + 0x18) == parent)
+      return child;
+  }
+  return 0;
+}
 }
 void RestoreWorldDriver() {
   auto d=driverMesh;
@@ -564,23 +581,28 @@ void RestoreWorldDriver() {
   unref(d.root);
   unref(d.mount);
 }
-bool PresentWorldDriver(Ptr hand, int handIndex, Ptr mount, const Transform &wrist) {
+bool PresentWorldDriver(Ptr hand, int handIndex, Ptr mount, const Transform &wrist,
+                        DriverBindTiming &timing) {
   if (driverMesh.part && (driverMesh.mount != mount ||
       read<Ptr>(driverMesh.root+0x18) != hand || read<Ptr>(driverMesh.part+0x18) != mount))
     RestoreWorldDriver();
   if (!hand || !mount) return false;
   if (!driverMesh.part) {
-    // The kit root stays directly under this wrist while its mesh is on the lock.
-    Ptr rootNode = FindSceneNode(hand, handIndex ? "TTWVRKit_1_1" : "TTWVRKit_0_1");
-    if (!rootNode || read<Ptr>(rootNode+0x18) != hand) return false;
-    Ptr part=FindSceneNode(rootNode,"KitPart2");
-    if (!part || read<Ptr>(part+0x18)!=rootNode) return false;
+    using Clock = std::chrono::steady_clock;
+    using Ms = std::chrono::duration<double, std::milli>;
+    const auto start = Clock::now();
+    Ptr rootNode = driverChild(hand, handIndex ? "TTWVRKit_1_1" : "TTWVRKit_0_1");
+    if (!rootNode) return false;
+    Ptr part = driverChild(rootNode, "KitPart2");
+    if (!part) return false;
+    const auto found = Clock::now();
     auto original=read<Transform>(part+0x34);
     if (!MountSceneChild(part,mount)) return false;
     retain(rootNode);
     retain(mount);
     driverMesh={rootNode,part,mount,original};
-    Log("live_driver_mesh_bound hand=%d", handIndex);
+    const auto attached = Clock::now();
+    timing = {true, Ms(found - start).count(), Ms(attached - found).count()};
   }
   const auto &parent=at<Transform>(mount+0x68);
   if (!(parent.scale>.0001f)) return false;

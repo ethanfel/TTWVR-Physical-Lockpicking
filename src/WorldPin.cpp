@@ -441,6 +441,7 @@ void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
                        owner >= 0 ? owner : 1 - driverHand, opening, twist, pinHealth, corrections);
     const auto solved = driver ? Clock::now() : Clock::time_point{};
     bool mounted = false;
+    DriverBindTiming bind;
     double meshMs = 0;
     for (int h=0;h<2;++h) {
       auto &c=corrections[h];
@@ -455,7 +456,7 @@ void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
         const auto meshStart = mount ? Clock::now() : Clock::time_point{};
         if (mount && wrist)
           mounted = PresentWorldDriver(hands[h], h, mount,
-              {mul(c.turn, wrist->rotation), wrist->position + shift, wrist->scale});
+              {mul(c.turn, wrist->rotation), wrist->position + shift, wrist->scale}, bind);
         else RestoreWorldDriver();
         if (mount) meshMs = Ms(Clock::now() - meshStart).count();
       }
@@ -467,9 +468,12 @@ void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
       const double armsMs = Ms(Clock::now() - solved).count() - meshMs;
       static const bool trace = GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE", nullptr, 0) > 0;
       static ULONGLONG nextReport = 0;
-      if ((trace || prepMs + solverMs + meshMs + armsMs >= 15) && GetTickCount64() >= nextReport) {
-        Log("live_driver_frame mounted=%d parked=%d prep_ms=%.3f lock_ms=%.3f mesh_ms=%.3f arms_ms=%.3f",
-            mounted, parked, prepMs, solverMs, meshMs, armsMs);
+      const bool reportDue = GetTickCount64() >= nextReport;
+      if ((trace && bind.bound) || (reportDue && (trace || prepMs + solverMs + meshMs + armsMs >= 15))) {
+        Log("live_driver_frame mounted=%d parked=%d prep_ms=%.3f lock_ms=%.3f mesh_ms=%.3f arms_ms=%.3f"
+            " hand=%d bound=%d lookup_ms=%.3f attach_ms=%.3f",
+            mounted, parked, prepMs, solverMs, meshMs, armsMs,
+            driverHand, bind.bound, bind.lookupMs, bind.attachMs);
         nextReport = GetTickCount64() + 1000;
       }
     }

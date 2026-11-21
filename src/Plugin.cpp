@@ -340,7 +340,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 94;  // Beta 0.2, revision 8.
+  p->version = 95;  // Beta 0.2, revision 9.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -353,7 +353,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=94 release=\"Beta 0.2\" build=live-driver-contact", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=95 release=\"Beta 0.2\" build=driver-attachment", n->runtime);
   const DWORD iniStatus = EnsureDefaultSettings(folder);
   if (iniStatus == ERROR_SUCCESS)
     Log("settings_created file=TTWVRPhysicalLockpicking.ini");
