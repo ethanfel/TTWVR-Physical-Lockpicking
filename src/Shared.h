@@ -63,12 +63,7 @@ bool MountSceneChild(uintptr_t node, uintptr_t parent);
 void RetainSceneNode(uintptr_t node);
 void ReleaseMountedChild(uintptr_t node);
 void RestoreWorldDriver();
-struct DriverBindTiming {
-  bool bound = false;
-  double lookupMs = 0, attachMs = 0;
-};
-bool PresentWorldDriver(uintptr_t hand, int handIndex, uintptr_t mount,
-                        const Transform &wrist, DriverBindTiming &timing);
+bool PresentWorldDriver(uintptr_t hand, int handIndex, uintptr_t mount, const Transform &wrist);
 void UpdateSceneNode(uintptr_t node);
 struct NativeCall { uintptr_t site, target; void *replacement; };
 bool InstallVerifiedCalls(const NativeCall *, size_t count);
