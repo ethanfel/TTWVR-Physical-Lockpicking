@@ -7,6 +7,7 @@
 #include "DriverContact.h"
 #include "PinBox.h"
 #include "ToolGeometry.h"
+#include <optional>
 namespace locks {
 inline Pose dropOriginPose(Pose lock) {
   Vec forward = rotate(lock.q, {0, 0, 1});
@@ -89,13 +90,14 @@ class PhysicalInteraction {
   // The contact pose defines the physical shaft. Only the admitted cylinder
   // angle turns the visible metal, including while the lock resists.
   void updateAxialDriver(const Pose (&hands)[2], Pose previous, float cylinder,
-                         unsigned acquired, bool manipulating, bool wasBlocked) {
+                         unsigned acquired, bool manipulating, bool wasBlocked, float dt) {
     auto &tool = tools[1];
     const auto &pin = tools[0];
     constexpr float seatDepth = .014f; // measured behind the visible plug face
     constexpr float stopDepth = .018f;
     Pose hand = tool.owner >= 0 ? hands[tool.owner] : Pose{};
     if (tool.inserted) {
+      tool.driverTracking = false;
       Vec axis = rotate(tool.seatPose.q, {0, 0, 1});
       // A released screwdriver remains supported. Regripping establishes a
       // fresh wrist reference at the current cylinder angle.
@@ -133,16 +135,47 @@ class PhysicalInteraction {
     if (tool.owner < 0) return;
     ToolShape shape(1, 1, 0, targetBounds);
     shape.driverStopZ = plugFaceZ - stopDepth;
-    Pose raw{hand.q, hand.p - rotate(hand.q, handleCenter(1) * targetBounds.toolScale[1])};
-    auto contact = moveAgainstHousing(shape, previous, raw, cylinder);
+    std::optional<ToolShape> wire;
+    if (pin.visible && !pin.holstered) wire.emplace(0, pin.opening, pin.bendYaw, targetBounds);
+    const Vec grip = handleCenter(1) * targetBounds.toolScale[1];
+    const Pose raw{hand.q, hand.p - rotate(hand.q, grip)};
+    Pose wanted = raw;
+    if (tool.driverTracking && !(acquired & 2u)) {
+      // Start each new movement at the constrained grip. Pushing a controller
+      // through a wall must not create a distance debt on the next withdrawal.
+      const Quat delta = multiply(hand.q, inverse(tool.driverTracked.q));
+      wanted.q = unit(multiply(delta, previous.q));
+      const Vec admittedGrip = world(previous, grip);
+      Vec travel = hand.p - tool.driverTracked.p;
+      const float distanceSquared = dot(travel, travel);
+      // If one sample takes the tracked hand past the admitted grip, stop at
+      // the hand rather than overshooting it by the former contact offset.
+      const float along = dot(hand.p - admittedGrip, travel);
+      if (along >= 0 && along < distanceSquared)
+        travel = travel * (along / distanceSquared);
+      Vec gripPosition = admittedGrip + travel;
+      if (!wasBlocked && shape.clearance(previous, cylinder) > .005f &&
+          shape.clearance(raw, cylinder) > .005f &&
+          (!wire || (pinDriverClearance(*wire, pin.pose, previous) > .005f &&
+                     pinDriverClearance(*wire, pin.pose, raw) > .005f))) {
+        wanted.q = rotateTowards(wanted.q, raw.q, dt * 180.f);
+        gripPosition = gripPosition + bounded(hand.p - gripPosition, dt * .4f);
+      }
+      wanted.p = gripPosition - rotate(wanted.q, grip);
+    }
+    auto contact = moveAgainstHousing(shape, previous, wanted, cylinder);
     tool.pose = contact.pose;
     tool.blocked = contact.hit;
-    if (pin.visible && !pin.holstered) {
-      auto between = sweepToolContact(ToolShape(0, pin.opening, pin.bendYaw, targetBounds),
-                                      pin.pose, pin.pose, previous, tool.pose);
-      tool.pose = between.driver;
+    if (wire) {
+      auto between = sweepToolContact(*wire, pin.pose, pin.pose, previous, tool.pose);
+      if (between.hit)
+        tool.pose = slideDriverPastPin(*wire, pin.pose, shape, between.driver, tool.pose, cylinder);
       tool.blocked |= between.hit;
     }
+    tool.driverTracked = hand;
+    const Quat gripDelta = multiply(inverse(hand.q), tool.pose.q);
+    tool.driverTracking = tool.blocked || length(world(tool.pose, grip) - hand.p) > .0001f ||
+                          length({gripDelta.x, gripDelta.y, gripDelta.z}) > .0005f;
     if (tool.blocked && !wasBlocked) housingHands |= 1u << tool.owner;
     float depth = plugFaceZ - tool.pose.p.z;
     Vec axis = rotate(tool.pose.q, {0, 0, 1});
@@ -744,7 +777,7 @@ public:
       }
     }
     if (config.driverMode == DriverMode::AxialTwist) {
-      updateAxialDriver(hands, previous[1], cylinder, acquired, manipulating, wasBlocked[1]);
+      updateAxialDriver(hands, previous[1], cylinder, acquired, manipulating, wasBlocked[1], dt);
     } else if (driver.owner >= 0 && driver.inserted) {
       if (!pin.inserted || !manipulating || (insertedEvents & 1u) ||
           (config.driverMode == DriverMode::SeatedLever && std::hypot(driver.leverStartHand.x, driver.leverStartHand.y) < .025f)) {

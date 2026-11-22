@@ -37,14 +37,27 @@ inline float scaledDriverDistance(Vec p,float scale) {
   return driverDistance(p*(1/scale))*scale;
 }
 inline float pinDriverClearance(const ToolShape &pin, Pose pinPose,
-                                Pose driverPose) {
+                                Pose driverPose, Vec *closest = nullptr) {
   float result = 1e9f;
   for (size_t n = 0; n < pin.count; n++) {
     auto b = pin.balls[n];
     Vec p = local(driverPose, world(pinPose, b.p));
-    result = std::min(result, scaledDriverDistance(p,pin.target.toolScale[1]) - b.r);
+    float gap = scaledDriverDistance(p,pin.target.toolScale[1]) - b.r;
+    if (gap < result) {
+      result = gap;
+      if (closest) *closest = p;
+    }
   }
   return result;
+}
+// Normal that moves the driver away from a pin sample in driver-local space.
+inline Vec pinContactNormal(Pose driver, Vec point, float scale) {
+  constexpr float e = .00002f;
+  auto distance = [&](Vec p) { return scaledDriverDistance(p, scale); };
+  Vec gradient{distance(point + Vec{e,0,0}) - distance(point - Vec{e,0,0}),
+               distance(point + Vec{0,e,0}) - distance(point - Vec{0,e,0}),
+               distance(point + Vec{0,0,e}) - distance(point - Vec{0,0,e})};
+  return rotate(driver.q, normal(gradient)) * -1.f;
 }
 // The native cylinder can move a supported pin into yesterday's driver pose.
 // Recover that externally introduced overlap before sweeping new hand motion;
@@ -52,8 +65,6 @@ inline float pinDriverClearance(const ToolShape &pin, Pose pinPose,
 inline Pose recoverDriverContact(const ToolShape &pin, Pose pinPose,
                                  const ToolShape &driver, Pose pose,
                                  float cylinder) {
-  auto distance=[&](Vec p){return scaledDriverDistance(p,driver.target.toolScale[1]);};
-  constexpr float e = .00002f;
   for (int pass = 0; pass < 24; ++pass) {
     pose = moveAgainstHousing(driver, pose, pose, cylinder).pose;
     // A moving slot can pinch a tilted blade between opposing walls. If
@@ -61,20 +72,10 @@ inline Pose recoverDriverContact(const ToolShape &pin, Pose pinPose,
     // outward instead of returning an embedded pose as an admitted start.
     for (int lift = 0; lift < 32 && driver.clearance(pose,cylinder) < .000005f; ++lift)
       pose.p.z += .0005f;
-    float gap = 1e9f;
     Vec closest;
-    for (size_t n = 0; n < pin.count; ++n) {
-      Vec p = local(pose, world(pinPose, pin.balls[n].p));
-      float d = distance(p) - pin.balls[n].r;
-      if (d < gap) { gap = d; closest = p; }
-    }
-    if (gap >= .000005f)
-      return pose;
-    Vec gradient = normal({
-        distance(closest + Vec{e, 0, 0}) - distance(closest - Vec{e, 0, 0}),
-        distance(closest + Vec{0, e, 0}) - distance(closest - Vec{0, e, 0}),
-        distance(closest + Vec{0, 0, e}) - distance(closest - Vec{0, 0, e})});
-    pose.p = pose.p - rotate(pose.q, gradient) * (.00005f - gap);
+    float gap = pinDriverClearance(pin, pinPose, pose, &closest);
+    if (gap >= .000005f) return pose;
+    pose.p = pose.p + pinContactNormal(pose, closest, driver.target.toolScale[1]) * (.00005f - gap);
   }
   return pose;
 }
@@ -143,5 +144,32 @@ inline ToolContact sweepToolContact(const ToolShape &shape, Pose pinFrom,
     d = interpolatePose(driverFrom, driverTo, t);
   }
   return {p, d, true};
+}
+// A stationary pin blocks the inward component at the point of contact.
+// Sweep the remaining motion along it, checking the housing on each slide.
+inline Pose slideDriverPastPin(const ToolShape &wire, Pose pin, const ToolShape &blade,
+                               Pose contact, Pose wanted, float cylinder) {
+  constexpr float skin = .00025f;
+  for (int pass = 0; pass < 3; ++pass) {
+    Vec point;
+    float gap = pinDriverClearance(wire, pin, contact, &point);
+    Vec outward = pinContactNormal(contact, point, blade.target.toolScale[1]);
+    if (dot(outward, outward) < .5f) break;
+    Pose start = contact;
+    if (gap < skin) {
+      Pose clear = contact;
+      clear.p = clear.p + outward * std::min(skin - gap, .002f);
+      clear = moveAgainstHousing(blade, contact, clear, cylinder).pose;
+      if (pinDriverClearance(wire, pin, clear) > gap) start = clear;
+    }
+    Pose end = wanted;
+    Vec motion = world(wanted, point) - world(start, point);
+    end.p = end.p - outward * std::min(0.f, dot(motion, outward));
+    end = moveAgainstHousing(blade, start, end, cylinder).pose;
+    auto slide = sweepToolContact(wire, pin, pin, start, end);
+    contact = slide.driver;
+    if (!slide.hit) break;
+  }
+  return contact;
 }
 } // namespace locks

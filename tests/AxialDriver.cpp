@@ -170,7 +170,77 @@ static void wedgedBlade(bool held) {
   if (!held) assert(length(driver.velocity) < .15f);
 }
 
+// Germantown door: the moving cylinder left the parked pin touching an
+// unseated blade at the front face. A pull along Z used to produce no motion.
+static void withdrawPastParkedPin() {
+  PhysicalInteraction sim;
+  sim.config.load("UseToolHolders=0\nRequirePinPreparation=0\n");
+  sim.update({}, {}, {}, 0, 0, 0);
+  auto &pin = sim.tools[0];
+  pin.visible = pin.inserted = true;
+  pin.holstered = false;
+  pin.opening = 1.174f;
+  pin.bendYaw = 1.640f;
+  pin.pose = {unit({-.20740f,-.72044f,-.22384f,.62277f}), {-.00303f,-.01050f,-.04711f}};
+  pin.seatPose = pin.pose;
+  pin.pinDepth = .0747f;
+  auto &driver = sim.tools[1];
+  driver.owner = 1;
+  driver.holstered = false;
+  driver.pose = {unit({-.00908f,-.07384f,-.00440f,-.99722f}), {.01031f,.00814f,.02493f}};
+  const auto start = driver.pose;
+  ToolShape wire(0,pin.opening,pin.bendYaw), blade(1);
+  blade.driverStopZ = plugFaceZ - .018f;
+  const Pose parked = pin.pose;
+  const float initialGap = pinDriverClearance(wire, parked, start);
+  assert(initialGap < 0 && initialGap > -.0001f);
+  Pose requested = start;
+  for (int frame = 0; frame < 45; ++frame) {
+    if (frame < 35) requested.p.z += .001f;
+    sim.update({}, {}, {requested.q,world(requested,handleCenter(1))}, 0, 1, 0);
+    assert(driver.owner == 1 && !driver.inserted && pin.inserted && sim.target == 0);
+    assert(length(pin.pose.p-parked.p) < .00001f);
+    assert(blade.clearance(driver.pose,0) >= -.00001f);
+    assert(pinDriverClearance(wire, parked, driver.pose) >= initialGap - .00001f);
+    if (frame == 9) assert(driver.pose.p.z > start.p.z + .004f);
+  }
+  assert(driver.pose.p.z > start.p.z + .03f);
+}
+
+// A controller can keep moving after the rigid tool hits the door. Its
+// first motion back out must move the tool even while the hand is behind it.
+static void easeOffDoorFace(float dt) {
+  PhysicalInteraction sim;
+  sim.config.load("UseToolHolders=0\nRequirePinPreparation=0\n");
+  sim.update({}, {}, {}, 0, 0, 0);
+  auto &driver = sim.tools[1];
+  driver.owner = 1;
+  driver.holstered = false;
+  Pose handTool{{},{.022f,0,.060f}};
+  driver.pose = handTool;
+  auto step = [&] {
+    sim.update({}, {}, {handTool.q, world(handTool,handleCenter(1))}, 0, 1, 0, dt);
+    assert(driver.owner == 1 && !driver.inserted && sim.target == 0);
+  };
+  for (int i = 0; i < 75; ++i) { handTool.p.z -= .001f; step(); }
+  const Vec stopped = driver.pose.p;
+  assert(stopped.z > plugFaceZ && handTool.p.z < 0);
+  for (int i = 0; i < 30; ++i) {
+    step();
+    assert(length(driver.pose.p - stopped) < .0004f);
+  }
+  for (int i = 0; i < 8; ++i) { handTool.p.y += .001f; step(); }
+  assert(driver.pose.p.y > stopped.y + .007f && driver.pose.p.z > plugFaceZ);
+  handTool.p.z += .004f; step();
+  assert(driver.pose.p.z > stopped.z + .003f);
+  for (int i = 0; i < 40; ++i) { handTool.p.z += .003f; step(); }
+  for (int i = 0; i < 30; ++i) step();
+  assert(length(driver.pose.p - handTool.p) < .0001f);
+}
+
 int main() {
+  withdrawPastParkedPin();
+  for (float hz : {45.f, 90.f, 120.f}) easeOffDoorFace(1.f / hz);
   wedgedBlade(true);
   wedgedBlade(false);
   Ergonomics cfg;
