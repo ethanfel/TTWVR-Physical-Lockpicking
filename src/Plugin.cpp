@@ -8,6 +8,7 @@
 #include "Shared.h"
 #include "Settings.h"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -192,6 +193,14 @@ bool __fastcall ActivateAfterUnlock(uintptr_t ref, void *, uintptr_t actor,
   using Activate = bool(__thiscall *)(uintptr_t, uintptr_t, int, int, int);
   return reinterpret_cast<Activate>(gameBase + 0x173170)(ref, actor, a, b, c);
 }
+// Draw3DElements already skips the vanilla lock when its model is absent.
+static std::atomic<uintptr_t> physicalMenu{0};
+static void *__fastcall StockModelForDraw(void *model, void *) {
+  const auto hidden = physicalMenu.load(std::memory_order_relaxed);
+  if (hidden && hidden == *reinterpret_cast<const uintptr_t *>(gameBase + 0xdda204)) return nullptr;
+  using GetModel = void *(__thiscall *)(void *);
+  return reinterpret_cast<GetModel>(gameBase + 0x159450)(model);
+}
 void InstallNative() {
   gameBase = uintptr_t(GetModuleHandleW(nullptr));
   const NativeCall hooks[] = {{gameBase + 0x39094d, gameBase + 0x623390,
@@ -228,9 +237,61 @@ void InstallNative() {
   tileSet = reinterpret_cast<SetFloatFn>(gameBase + 0x6012d0);
   tileGet = reinterpret_cast<GetFloatFn>(gameBase + 0x6011b0);
   if (!InstallVerifiedCalls(hooks, sizeof(hooks) / sizeof(hooks[0]))) return;
+  const NativeCall draw{gameBase + 0x38e7ea, gameBase + 0x159450,
+                        reinterpret_cast<void *>(StockModelForDraw)};
+  Log("stock_lock_draw_filter installed=%d", InstallVerifiedCalls(&draw, 1));
   nativeReady = true;
   Log("native_input_hooks_ready verified_calls=14 manual_door_activation=1");
 }
+// A zero alpha on the menu root does not hide the independently styled text.
+static uintptr_t LockContentBranch(uintptr_t menu, uintptr_t root) {
+  // Walk from the registered skill tile to the content branch beneath the
+  // menu. This also works with replacement layouts that rename the branch.
+  auto tile = *reinterpret_cast<const uintptr_t *>(menu + 0x2c);
+  for (unsigned depth = 0; depth < 32 && tile && tile != root; ++depth) {
+    if (!Readable(reinterpret_cast<const void *>(tile), 0x3c)) break;
+    const auto parent = *reinterpret_cast<const uintptr_t *>(tile + 0x28);
+    if (parent == root) return tile;
+    tile = parent;
+  }
+  return 0;
+}
+struct StockLockMenu {
+  uintptr_t menu = 0, root = 0, content = 0;
+  float alpha = 255.f, visible = 1.f;
+
+  void update(uintptr_t currentMenu, uintptr_t currentRoot, bool hide) {
+    if (menu != currentMenu || root != currentRoot) *this = {};
+    if ((!hide && !menu) || !Readable(reinterpret_cast<void *>(currentRoot), 0x3c)) return;
+    constexpr unsigned alphaTrait = 0xfa9, visibleTrait = 0xfa3;
+    auto *rootTile = reinterpret_cast<void *>(currentRoot);
+    if (hide) {
+      if (!menu) {
+        alpha = tileGet(rootTile, alphaTrait);
+        if (!std::isfinite(alpha)) return;
+        menu = currentMenu;
+        root = currentRoot;
+        tileSet(rootTile, alphaTrait, 0.f, true);
+      }
+      if (!content) {
+        auto branch = LockContentBranch(menu, root);
+        if (branch) {
+          auto *tile = reinterpret_cast<void *>(branch);
+          visible = tileGet(tile, visibleTrait);
+          if (std::isfinite(visible)) {
+            content = branch;
+            tileSet(tile, visibleTrait, 0.f, true);
+          }
+        }
+      }
+    } else {
+      if (content && content == LockContentBranch(menu, root))
+        tileSet(reinterpret_cast<void *>(content), visibleTrait, visible, true);
+      tileSet(rootTile, alphaTrait, alpha, true);
+      *this = {};
+    }
+  }
+};
 void __cdecl OnMessage(Message *m) {
   if (m && (m->type == 2 || m->type == 6 || m->type == 8 || m->type == 14)) ResetKit();
   if (m && m->type == 18) {
@@ -270,29 +331,15 @@ void __cdecl OnMessage(Message *m) {
       next.health = *reinterpret_cast<const float *>(p + 0x94);
     }
   }
-  // Keep the native success transaction off the player's HUD. Restore a live
-  // menu's previous alpha if its reference or transaction changes.
-  static uintptr_t maskedMenu = 0, maskedTile = 0;
-  static float savedAlpha = 255;
-  bool completing = CompleteWorldLock(next);
-  auto root = next.menu ? *reinterpret_cast<uintptr_t *>(next.menu + 4) : 0;
-  const bool hideMenu = completing || HostMenuPresented(next.menu);
-  if (maskedMenu && (!hideMenu || next.menu != maskedMenu || root != maskedTile)) {
-    if (next.menu == maskedMenu && root == maskedTile && Readable((void *)root, 0x3c))
-      tileSet((void *)root, 0xfa9, savedAlpha, true);
-    maskedMenu = maskedTile = 0;
-  }
-  if (hideMenu) {
-    if (!maskedMenu && nativeReady && Readable((void *)root, 0x3c)) {
-      savedAlpha = tileGet((void *)root, 0xfa9);
-      if (std::isfinite(savedAlpha)) {
-        tileSet((void *)root, 0xfa9, 0.f, true);
-        maskedMenu = next.menu;
-        maskedTile = root;
-      }
-    }
-    if (completing) return;
-  }
+  const bool completing = CompleteWorldLock(next);
+  const auto root = next.menu ? *reinterpret_cast<const uintptr_t *>(next.menu + 4) : 0;
+  static StockLockMenu stockMenu;
+  const bool closing = next.menu && next.menu == physicalMenu.load(std::memory_order_relaxed) && next.stage == 7;
+  const bool hideMenu = nativeReady && next.menu &&
+                        (completing || NativeScenePresented(next.menu) || closing);
+  physicalMenu.store(hideMenu ? next.menu : 0, std::memory_order_relaxed);
+  stockMenu.update(next.menu, root, hideMenu);
+  if (completing) return;
   if (DismissLockMenu(next)) return;
   UpdateTarget(next);
   // Latch the approached face for the attempt. Leaning through the close-up
@@ -343,7 +390,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 98;  // Beta 0.2, revision 12.
+  p->version = 99;  // Beta 0.2, revision 13.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -356,7 +403,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=98 release=\"Beta 0.2\" build=axial-seat-contact", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=99 release=\"Beta 0.2\" build=stock-lock-visuals", n->runtime);
   const DWORD iniStatus = EnsureDefaultSettings(folder);
   if (iniStatus == ERROR_SUCCESS)
     Log("settings_created file=TTWVRPhysicalLockpicking.ini");
