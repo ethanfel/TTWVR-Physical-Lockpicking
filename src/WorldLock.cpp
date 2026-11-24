@@ -192,7 +192,7 @@ void discardParkedPin() {
 }
 Ptr finishing = 0;
 unsigned finishingID = 0;
-bool submitted = false;
+bool submitted = false, forceFinish = false;
 // The stock menu resolves ownership again during the success transaction.
 using OwnerOf = Ptr(__thiscall *)(Ptr);
 OwnerOf ownerOf = nullptr;
@@ -225,7 +225,8 @@ Ptr __fastcall ownerOnSuccess(Ptr ref, void *) {
   return owner;
 }
 void checkWitness(ULONGLONG now, Ptr pc) {
-  if (!findWitness || active.level < 0 || !model.pin || now < nextWitnessCheck)
+  const bool forcing = model.physics.forceEvent != ForceGesture::None;
+  if (!findWitness || active.level < 0 || (!model.pin && !forcing) || (!forcing && now < nextWitnessCheck))
     return;
   nextWitnessCheck = now + 400;
   Ptr owner = ownerOf(active.ref);
@@ -828,9 +829,22 @@ bool WorldLockFrame(GameState &g, const LiveTool *wire, const Transform *hand,
   model.physics.doorTurnSign = active.door ? twistDirection(active.kind, active.side) : 1;
   model.physics.targetBounds.style=LockStyle(mounts[active.kind-1].style);
   model.physics.targetBounds.panel=panelsReady ? &panels[active.kind-1][active.side] : nullptr;
+  ForcePalms palms;
+  palms.metresPerUnit = 1.f/(g.worldUnitsPerMeter*f.factor);
+  Transform offhand;
+  if (hand && !wire && active.level >= 0 && KitControllerWorld(pinHand, offhand, true)) {
+    palms.point[pinHand] = f.point(offhand.position);
+    palms.open = 1u << pinHand;
+  }
   model.step(wire ? &w : nullptr,hand ? &d : nullptr,opening,twist,parkedMesh!=0,pinHand,
              turn.cylinder,turn.stage,pinHealth,dt,1.f/(g.worldUnitsPerMeter*f.factor),
-             f.point(eye).z>plugFaceZ);
+             f.point(eye).z>plugFaceZ, &palms);
+  static uint64_t lastKnock = 0;
+  if (model.physics.forceEvent == ForceGesture::Knock) {
+    lastKnock = (now << 1) | unsigned(1-pinHand);
+    Log("force_lock_tap mode=live ref=%08x driver=%d",active.id,1-pinHand);
+  }
+  g.worldKnock = lastKnock;
   if (model.pin && active.level>=0 && !entered && beginRules(pc,active.level)) {
     entered=true; sound(0x10745e0,0x121);
   }
@@ -894,17 +908,19 @@ bool WorldLockFrame(GameState &g, const LiveTool *wire, const Transform *hand,
     }
     return broke;
   }
-  if (turn.stage==3 && turn.cylinder>=90 && active.level>=0 && pinHealth>0) {
+  const bool force = model.physics.forceEvent == ForceGesture::Attempt;
+  if ((force || (turn.stage==3 && turn.cylinder>=90)) && active.level>=0 && pinHealth>0) {
     auto selected = active;
     clear(false);
     finishing = selected.ref;
     finishingID = selected.id;
     finishingOwner = reportedRef == selected.id ? reportedOwner : 0;
     submitted = false;
+    forceFinish = force;
     deadline = now + 3200;
     if (call(action, selected.ref, 1) <= 0)
       finishing = 0;
-    Log("live_lock_solved ref=%08x native_activation=%d", selected.id,
+    Log("live_lock_%s ref=%08x native_activation=%d", force ? "force" : "solved", selected.id,
         finishing != 0);
   }
   return false;
@@ -921,7 +937,7 @@ bool CompleteWorldLock(const GameState &g) {
   }
   if (!g.menu) {
     const bool unlocked = !locked(finishing);
-    if (unlocked || GetTickCount64() > deadline) {
+    if (unlocked || (submitted && forceFinish) || GetTickCount64() > deadline) {
       if (unlocked) puzzle = {};
       Log("live_lock_result ref=%08x unlocked=%d", finishingID, unlocked);
       finishing = 0;
@@ -938,6 +954,14 @@ bool CompleteWorldLock(const GameState &g) {
   // The physical turn is complete. Let New Vegas perform its own success
   // transaction (XP, statistics, crime and unlock). Doors wait for the player.
   // This singleton is never published as an interactive VR workspace.
+  if (forceFinish) {
+    // Submit the stock Force button only when the hidden menu accepts input.
+    if (!submitted && g.stage == 2 && g.health > 0) {
+      submitted = true;
+      if (!NativeForceLock(g)) finishing = 0;
+    }
+    return true;
+  }
   if (!submitted && (g.stage == 0 || g.stage == 2 || g.stage == 3) && g.health > 0) {
     submitted = true;
     Log("live_lock_native_commit ref=%08x stage=%u", finishingID, g.stage);

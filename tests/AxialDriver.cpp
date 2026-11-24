@@ -61,6 +61,48 @@ static void trial(LockStyle style, int driverHand, bool centered, int sign) {
   }
   blade.p.z = plugFaceZ - .015f; step();
   assert(driver.inserted && driver.owner == driverHand && close.insertedEvents == 2);
+  // The same tracked offhand and newly measured wrist twist drive both modes.
+  {
+    auto c = close;
+    auto m = live;
+    ForcePalms palms;
+    palms.open = 1u << pinHand;
+    auto forceStep = [&](float behind, float angle, float pull = 0.f) {
+      Pose raw{axisAngle({0,0,1},-sign*angle*pi/180), blade.p+Vec{0,0,pull}};
+      Pose h[2]{hands[0],hands[1]};
+      h[driverHand] = {raw.q,world(raw,handleCenter(1))};
+      palms.point[pinHand] = blade.p + Vec{0,0,driverLength+behind};
+      LiveTool tool{raw.p,rotate(raw.q,{0,0,1}),h[driverHand].p,rotate(raw.q,{0,1,0}),
+                    1,rotate(raw.q,{1,0,0})};
+      c.update({},h[0],h[1],driverHand==0,driverHand==1,0,.01f,2,1,nullptr,nullptr,&palms);
+      m.step(nullptr,&tool,1,0,true,pinHand,0,2,1,.01f,1,true,&palms);
+      assert(m.physics.forceEvent == c.forceEvent && std::abs(c.target-m.demand)<.001f);
+      assert(length(c.tools[1].pose.p - m.shown[1].p) < .0001f);
+      return c.forceEvent;
+    };
+    assert(forceStep(.025f,0) == ForceGesture::None); // initial overlap
+    forceStep(.085f,0);
+    palms.open=0; forceStep(.045f,0); // tracking loss, regrip or button press
+    palms.open=1u<<pinHand;
+    assert(forceStep(.025f,0) == ForceGesture::None);
+    forceStep(.085f,0);
+    assert(forceStep(.025f,0) == ForceGesture::Knock);
+    assert(c.tools[1].pose.p.z < driver.pose.p.z-.0025f);
+    assert(forceStep(.075f,0,.008f) == ForceGesture::None); // backing out cancels
+    assert(forceStep(.075f,20,.008f) == ForceGesture::None && c.target>0);
+    forceStep(.09f,0);
+    for (int mm=88; mm>32; mm-=2) assert(forceStep(mm*.001f,0) == ForceGesture::None);
+    // First tap changed the seating depth, so use the actual endcap again.
+    bool knocked=false;
+    for (int mm=32; mm>=20; --mm) knocked |= forceStep(mm*.001f,0) == ForceGesture::Knock;
+    assert(knocked);
+    assert(forceStep(.021f,12) == ForceGesture::None && c.target == 0);
+    forceStep(.085f,12); // establish a fresh angle after separation
+    assert(forceStep(.085f,8) == ForceGesture::None);
+    assert(forceStep(.085f,25) == ForceGesture::None);
+    assert(forceStep(.085f,29) == ForceGesture::Attempt && c.target == 0);
+    for (int i=0; i<10; ++i) assert(forceStep(.085f,29) == ForceGesture::None);
+  }
   const Vec seated = driver.pose.p;
   // A player can lean on a seated blade while twisting against resistance.
   // Neither lateral movement nor pressing into the stop withdraws the tip.
@@ -239,6 +281,28 @@ static void easeOffDoorFace(float dt) {
 }
 
 int main() {
+  ForceGesture gesture;
+  Pose cap{};
+  auto move=[&](Vec palm, float wrist=0.f, bool neutral=true) {
+    return gesture.step(1,cap,{axisAngle({0,0,1},wrist*pi/180),{}},palm,1,1,neutral);
+  };
+  move({0,0,.080f});
+  cap.p.z=.052f;
+  assert(move({0,0,.080f})==ForceGesture::None); // handle advances into resting palm
+  cap={}; move({0,0,.080f});
+  assert(gesture.step(1,cap,{{},{0,0,-.055f}},{0,0,.025f},1,1,true)==ForceGesture::None);
+  move({0,0,.08f}); // shared two-hand translation cannot count as a tap
+  assert(move({.060f,0,.04f})==ForceGesture::None);
+  assert(move({.002f,0,.024f})==ForceGesture::None); // side brush
+  move({0,0,.08f});
+  assert(move({0,0,.025f},9)==ForceGesture::None); // wrist already twisting
+  move({0,0,.08f});
+  assert(move({0,0,.025f},0,false)==ForceGesture::None); // normal torque
+  move({0,0,.08f});
+  assert(move({0,0,.025f})==ForceGesture::Knock);
+  move({0,0,.08f});
+  assert(move({0,0,.08f},22)==ForceGesture::None); // wrong direction
+  assert(move({0,0,.08f},-22)==ForceGesture::None);
   withdrawPastParkedPin();
   for (float hz : {45.f, 90.f, 120.f}) easeOffDoorFace(1.f / hz);
   wedgedBlade(true);

@@ -40,7 +40,7 @@ Packet packet;
 Mat xrToWorld;
 Vec xrOrigin, worldEye;
 Pose kitController[2];
-unsigned kitTracked = 0;
+unsigned kitTracked = 0, kitOpen = 0;
 uint64_t kitPoseTime = 0;
 Transform workspaceWorld;
 bool calibrated = false;
@@ -688,15 +688,16 @@ bool WorldEye(Vec &p) {
   p=worldEye;
   return true;
 }
-void SampleKitControllers(const Pose (&poses)[2], unsigned valid) {
+void SampleKitControllers(const Pose (&poses)[2], unsigned valid, unsigned open) {
   std::lock_guard guard(mutex);
   std::copy(poses, poses + 2, kitController);
   kitTracked = valid;
+  kitOpen = open;
   kitPoseTime = GetTickCount64();
 }
-bool KitControllerWorld(int hand, Transform &world) {
+bool KitControllerWorld(int hand, Transform &world, bool requireOpen) {
   std::lock_guard guard(mutex);
-  if (!calibrated || !(kitTracked & (1u << hand)) || GetTickCount64() - kitPoseTime > 180)
+  if (!calibrated || (requireOpen && !(kitOpen & (1u << hand))) || !(kitTracked & (1u << hand)) || GetTickCount64() - kitPoseTime > 180)
     return false;
   const Pose &p = kitController[hand];
   world = {mul(xrToWorld, matrix(p.q)), xrOrigin + xrToWorld.apply(p.p) * units, 1};

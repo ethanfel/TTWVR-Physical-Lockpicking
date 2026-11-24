@@ -5,6 +5,7 @@
 #include "ToolContact.h"
 #include "DriverCan.h"
 #include "DriverContact.h"
+#include "ForceGesture.h"
 #include "PinBox.h"
 #include "ToolGeometry.h"
 #include <optional>
@@ -49,6 +50,7 @@ class PhysicalInteraction {
   Segment previousHands[2];
   bool handsInitialized = false;
   bool pinLoaded = false;
+  ForceGesture forcing;
 
   void syncOwners() {
     pickHand = tools[0].owner;
@@ -303,6 +305,7 @@ public:
   int pickHand = -1, screwdriverHand = -1, bendHand = -1;
   Vec bendStartHelper, bendStartTip;
   unsigned preparedHands = 0;
+  ForceGesture::Event forceEvent = ForceGesture::None;
   float pick = 90, target = 0, pinTremor = 0;
   bool pickNear = false, screwdriverNear = false;
   unsigned insertedEvents = 0, withdrawnEvents = 0, recovered = 0,
@@ -345,7 +348,9 @@ public:
   bool seated() const { return tools[0].inserted && tools[1].inserted; }
   void update(Pose lock, Pose left, Pose right, float lt, float rt,
               float progress, float dt = 1.f / 90, unsigned stage = 2,
-              float health = 1, const Pose *pinches = nullptr, const MountedTools *mounted = nullptr) {
+              float health = 1, const Pose *pinches = nullptr, const MountedTools *mounted = nullptr,
+              const ForcePalms *palms = nullptr) {
+    forceEvent = ForceGesture::None;
     dt = std::isfinite(dt) ? std::clamp(dt, 0.f, .05f) : 0;
     insertedEvents = withdrawnEvents = recovered = preparedHands =
         storedEvents = droppedEvents = housingHands = rummagedHands = 0;
@@ -778,6 +783,28 @@ public:
     }
     if (config.driverMode == DriverMode::AxialTwist) {
       updateAxialDriver(hands, previous[1], cylinder, acquired, manipulating, wasBlocked[1], dt);
+      const int h = driver.owner;
+      if (stage != 2 || !driver.inserted || h < 0 || !palms || !(palms->open & (1u << (1-h))) ||
+          pin.owner >= 0 || bendHand >= 0 || acquired || insertedEvents || health <= 0 ||
+          dot(hands[h].p - driver.seatHand, rotate(driver.seatPose.q,{0,0,1})) * palms->metresPerUnit > .005f) {
+        forcing.reset();
+      } else {
+        Pose cap{driver.pose.q, world(driver.pose, {0,0,driverLength * targetBounds.toolScale[1]})};
+        forceEvent = forcing.step(h, cap, hands[h], palms->point[1-h], palms->metresPerUnit,
+                                  doorTurnSign, target < 1.f && std::abs(cylinder) < 1.f);
+        if (forceEvent == ForceGesture::Knock) {
+          Vec axis = rotate(driver.seatPose.q,{0,0,1});
+          // Move the rigid tool as one piece; repeated taps cannot ratchet past the stop.
+          float travel = std::clamp((driver.seatPose.p.z - plugFaceZ + .021f) / axis.z, 0.f, .003f);
+          driver.seatPose.p = driver.seatPose.p - axis * travel;
+          driver.pose.p = driver.pose.p - axis * travel;
+        }
+        if (forcing.engaged()) {
+          target = 0;
+          driver.wristReference = hands[h].q;
+          driver.shaftTravel = driver.leverStartCylinder = 0;
+        }
+      }
     } else if (driver.owner >= 0 && driver.inserted) {
       if (!pin.inserted || !manipulating || (insertedEvents & 1u) ||
           (config.driverMode == DriverMode::SeatedLever && std::hypot(driver.leverStartHand.x, driver.leverStartHand.y) < .025f)) {

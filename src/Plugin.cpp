@@ -19,6 +19,14 @@ std::mutex sharedMutex;
 GameState game;
 Control control;
 static bool nativeReady = false;
+static std::atomic<uintptr_t> forcedMenu{0};
+struct ForceRequest { uintptr_t menu = 0, target = 0; uint64_t stamp = 0; };
+static ForceRequest pendingForce;  // guarded by sharedMutex
+void RequestForceLock(const GameState &state) {
+  std::lock_guard guard(sharedMutex);
+  if (state.menu && state.target && game.menu == state.menu && game.target == state.target)
+    pendingForce = {state.menu,state.target,GetTickCount64()};
+}
 bool NativeReady() { return nativeReady; }
 static uintptr_t gameBase = 0;
 using AxisFn = int(__thiscall *)(void *);
@@ -129,7 +137,7 @@ float __cdecl CylinderLimit(float proposed, float resistanceLimit) {
   auto c = Current();
   // This clamp can only reduce the game's permitted rotation. Native
   // resistance, breakage and success checks run afterwards, unchanged.
-  return c.valid && std::isfinite(c.targetAngle)
+  return c.valid && c.menu != forcedMenu.load() && std::isfinite(c.targetAngle)
              ? capCylinder(native, c.turning ? c.targetAngle : 0.f)
              : native;
 }
@@ -292,6 +300,22 @@ struct StockLockMenu {
     }
   }
 };
+// Same virtual click handler and Force tile used by the stock lock menu.
+bool NativeForceLock(const GameState &state) {
+  if (!nativeReady || !state.menu || !state.target || state.stage != 2 ||
+      *reinterpret_cast<uintptr_t *>(gameBase + 0xdda204) != state.menu) return false;
+  auto table = *reinterpret_cast<uintptr_t **>(state.menu);
+  if (uintptr_t(table) != gameBase + 0xc7439c || table[3] != gameBase + 0x390330 ||
+      *reinterpret_cast<uintptr_t *>(state.menu + 0x6c) != state.target) return false;
+  auto tile = *reinterpret_cast<uintptr_t *>(state.menu + 0x50);
+  if (!Readable(reinterpret_cast<void *>(tile),0x3c)) return false;
+  forcedMenu.store(state.menu);
+  Log("force_lock_attempt menu=%08x ref=%08x",unsigned(state.menu),
+      *reinterpret_cast<unsigned *>(state.target + 0xc));
+  using Click = void(__thiscall *)(uintptr_t,int,uintptr_t);
+  reinterpret_cast<Click>(table[3])(state.menu,9,tile);
+  return true;
+}
 void __cdecl OnMessage(Message *m) {
   if (m && (m->type == 2 || m->type == 6 || m->type == 8 || m->type == 14)) ResetKit();
   if (m && m->type == 18) {
@@ -300,8 +324,7 @@ void __cdecl OnMessage(Message *m) {
   }
   if (!m || m->type != 20)
     return;
-  // New Vegas 1.4.0.525: LockPickMenu singleton. Only read here; never unlock
-  // by force.
+  // New Vegas 1.4.0.525 lock menu singleton.
   auto base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
   auto address = reinterpret_cast<uintptr_t *>(base + 0xdda204);
   GameState next;
@@ -331,7 +354,18 @@ void __cdecl OnMessage(Message *m) {
       next.health = *reinterpret_cast<const float *>(p + 0x94);
     }
   }
+  if (forcedMenu.load() != next.menu || next.stage == 2) forcedMenu.store(0);
+  ForceRequest request;
+  {
+    std::lock_guard guard(sharedMutex);
+    request = pendingForce;
+    pendingForce = {};
+  }
+  if (request.menu && request.menu == next.menu && request.target == next.target &&
+      GetTickCount64() - request.stamp < 250 && NativeForceLock(next)) return;
   const bool completing = CompleteWorldLock(next);
+  // A failed stock force attempt may synchronously close the menu.
+  if (completing && *address != next.menu) return;
   const auto root = next.menu ? *reinterpret_cast<const uintptr_t *>(next.menu + 4) : 0;
   static StockLockMenu stockMenu;
   const bool closing = next.menu && next.menu == physicalMenu.load(std::memory_order_relaxed) && next.stage == 7;
@@ -390,7 +424,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 100;  // Beta 0.2, revision 14.
+  p->version = 101;  // Beta 0.2, revision 15.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -403,7 +437,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=100 release=\"Beta 0.2\" build=driver-contact-slide", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=101 release=\"Beta 0.2\" build=palm-tap-force-lock", n->runtime);
   const DWORD iniStatus = EnsureDefaultSettings(folder);
   if (iniStatus == ERROR_SUCCESS)
     Log("settings_created file=TTWVRPhysicalLockpicking.ini");

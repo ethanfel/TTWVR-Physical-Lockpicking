@@ -124,6 +124,7 @@ struct Session {
   bool captureStill = false, captureGame = false;
   uint64_t captureRequestPoll = 0;
   HapticFeedback feedback, worldFeedback;
+  uint64_t lastWorldKnock = 0;
   unsigned previousSeated=0, previousSurface[2]{}, pendingHousing=0;
   TargetOpening opening;
   XrTime openingTime = 0;
@@ -280,6 +281,11 @@ XrResult SendFeedback(Session &s, int hand, bool kit, const Pulse *pulse) {
   vibration.amplitude = pulse->amplitude;
   vibration.frequency = XR_FREQUENCY_UNSPECIFIED;
   return i.ApplyHapticFeedback(s.handle, &info, reinterpret_cast<XrHapticBaseHeader *>(&vibration));
+}
+void KnockFeedback(Session &s, int driver, bool live) {
+  const Pulse tap{Cue::Housing,.55f,20}, seat{Cue::Insert,.88f,40};
+  SendFeedback(s,1-driver,live,&tap);
+  SendFeedback(s,driver,live,&seat);
 }
 void StopFeedback(Session &s) {
   const auto active = s.feedback.active(GetTickCount64());
@@ -755,7 +761,7 @@ struct KitSample {
 };
 void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit, bool sampleKit, bool succeeded) {
   auto &[valid,triggers,grips,gripActive,triggerActive,palms,kitController,trackedGrips,gripTime,triggerTime] = sample;
-  if (sampleKit) SampleKitControllers(kitController, trackedGrips);
+  if (sampleKit) SampleKitControllers(kitController, trackedGrips, gripActive & triggerActive & ~(grips | triggers));
   static bool kitTrace=GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE",nullptr,0)>0;
   static ULONGLONG kitTraceTime=0;
   if(kitTrace && valid==3 && GetTickCount64()>=kitTraceTime) {
@@ -816,6 +822,11 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
       auto result=SendFeedback(s,n,true,&pulse);
       if (pulse.cue==Cue::Housing) s.pendingHousing &= ~(1u<<n);
       if (kitTrace) Log("live_haptic hand=%d cue=%s result=%d",n,cueName(pulse.cue),int(result));
+    }
+    if (g.worldKnock && g.worldKnock != s.lastWorldKnock) {
+      s.lastWorldKnock = g.worldKnock;
+      if (GetTickCount64() - (g.worldKnock >> 1) < 160)
+        KnockFeedback(s, int(g.worldKnock & 1), true);
     }
     s.previousSeated=g.worldSeated;
   } else {
@@ -1121,9 +1132,16 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
   Pose driverHands[2]{fittedDriver ? driverHandPose(left) : left,
                       fittedDriver ? driverHandPose(right) : right};
   auto physicsStart = std::chrono::steady_clock::now();
+  ForcePalms tapPalms;
+  for (int h=0; h<2; ++h) {
+    tapPalms.point[h] = local(s.lock, palms[h]);
+    if (holds[h] <= .2f && (activeMask & (1u << h)) && (activeMask & (20u << h)))
+      tapPalms.open |= 1u << h;
+  }
   input.update(s.lock, compose(driverHands[0], s.renderer->DriverGrip(0)),
                compose(driverHands[1], s.renderer->DriverGrip(1)), holds[0], holds[1],
-               g.cylinder, dt, g.stage, g.health, pinches);
+               g.cylinder, dt, g.stage, g.health, pinches, nullptr, &tapPalms);
+  if (input.forceEvent == ForceGesture::Attempt) RequestForceLock(g);
   if (s.interaction.config.nativeScene)
     s.physicsMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - physicsStart).count();
   if (input.droppedEvents && !s.dropRequest) {
@@ -1304,6 +1322,10 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
           condition, feedback.pressure, pulse.intervalMs, input.target,
           g.cylinder, result);
     }
+  }
+  if (input.forceEvent == ForceGesture::Knock) {
+    KnockFeedback(s,input.screwdriverHand,false);
+    Log("force_lock_tap mode=closeup ref=%08x driver=%d",g.targetRefId,input.screwdriverHand);
   }
   return true;
 }

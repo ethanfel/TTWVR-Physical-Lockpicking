@@ -23,7 +23,7 @@ struct MountedInteraction {
   void step(const LiveTool *wire, const LiveTool *driver, float opening,
             float twist, bool parked, int pinHand, float cylinder,
             unsigned stage, float health, float dt, float travelScale,
-            bool facing) {
+            bool facing, const ForcePalms *palms = nullptr) {
     MountedTools kit{{wire ? pinHand : -1, driver ? 1 - pinHand : -1},
                      opening,
                      twist,
@@ -49,7 +49,7 @@ struct MountedInteraction {
           pose.q, world(pose, handleCenter(k, opening, twist) * raw[k]->scale)};
     }
     physics.update({}, hands[0], hands[1], 0, 0, cylinder, dt, stage, health,
-                   hands, &kit);
+                   hands, &kit, palms);
     pin = physics.tools[0].inserted;
     blade = physics.tools[1].inserted;
     demand = physics.target;
