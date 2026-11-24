@@ -199,6 +199,7 @@ class PhysicalInteraction {
                      turnWithCylinder({{}, tool.pose.p}, -cylinder).p};
     tool.wristReference = hand.q;
     tool.seatHand = hand.p;
+    tool.seatDepth = depth; // Normal insertion is the reference for a subsequent force tap.
     tool.leverStartCylinder = std::abs(cylinder);
     tool.shaftTravel = 0;
     insertedEvents |= 2u;
@@ -439,9 +440,10 @@ public:
       t.lastHand = hand.p;
       t.seatedRadius = length(hand.p - turnWithCylinder({{}, mouth(best, targetBounds.style)}, cylinder).p);
       t.seatHand = hand.p;
-      t.seatDepth = t.pinDepth;
-      if (!(best == 1 && t.inserted && config.driverMode == DriverMode::AxialTwist))
+      if (!(best == 1 && t.inserted && config.driverMode == DriverMode::AxialTwist)) {
+        t.seatDepth = t.pinDepth;
         t.seatPose = best == 1 && t.inserted ? turnWithCylinder(t.pose, -cylinder) : t.pose;
+      }
       t.lastRawTip = t.pose.p;
       if (best == 0 && t.inserted)
         t.entryAxis = normal(rotate(t.pose.q, pinHinge(t.opening, t.bendYaw)));
@@ -794,8 +796,11 @@ public:
                                   doorTurnSign, target < 1.f && std::abs(cylinder) < 1.f);
         if (forceEvent == ForceGesture::Knock) {
           Vec axis = rotate(driver.seatPose.q,{0,0,1});
-          // Move the rigid tool as one piece; repeated taps cannot ratchet past the stop.
-          float travel = std::clamp((driver.seatPose.p.z - plugFaceZ + .021f) / axis.z, 0.f, .003f);
+          // Set the stop one physical stroke beyond the original seat, even on scaled world locks.
+          constexpr float forceStrokeMetres = .012f;
+          const float stroke = forceStrokeMetres / palms->metresPerUnit;
+          const float depthPastSeat = (plugFaceZ - driver.seatPose.p.z - driver.seatDepth) / axis.z;
+          const float travel = std::clamp(stroke - depthPastSeat, 0.f, stroke);
           driver.seatPose.p = driver.seatPose.p - axis * travel;
           driver.pose.p = driver.pose.p - axis * travel;
         }

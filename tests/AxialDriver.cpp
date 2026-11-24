@@ -61,21 +61,22 @@ static void trial(LockStyle style, int driverHand, bool centered, int sign) {
   }
   blade.p.z = plugFaceZ - .015f; step();
   assert(driver.inserted && driver.owner == driverHand && close.insertedEvents == 2);
-  // The same tracked offhand and newly measured wrist twist drive both modes.
-  {
+  // Check the stroke in player metres across close-up and world mount scales.
+  for (float metresPerUnit : {.7f, 1.f, 1.3f}) {
     auto c = close;
     auto m = live;
     ForcePalms palms;
     palms.open = 1u << pinHand;
+    palms.metresPerUnit = metresPerUnit;
     auto forceStep = [&](float behind, float angle, float pull = 0.f) {
-      Pose raw{axisAngle({0,0,1},-sign*angle*pi/180), blade.p+Vec{0,0,pull}};
+      Pose raw{axisAngle({0,0,1},-sign*angle*pi/180), blade.p+Vec{0,0,pull/metresPerUnit}};
       Pose h[2]{hands[0],hands[1]};
       h[driverHand] = {raw.q,world(raw,handleCenter(1))};
-      palms.point[pinHand] = blade.p + Vec{0,0,driverLength+behind};
+      palms.point[pinHand] = c.tools[1].seatPose.p + Vec{0,0,driverLength+behind/metresPerUnit};
       LiveTool tool{raw.p,rotate(raw.q,{0,0,1}),h[driverHand].p,rotate(raw.q,{0,1,0}),
                     1,rotate(raw.q,{1,0,0})};
       c.update({},h[0],h[1],driverHand==0,driverHand==1,0,.01f,2,1,nullptr,nullptr,&palms);
-      m.step(nullptr,&tool,1,0,true,pinHand,0,2,1,.01f,1,true,&palms);
+      m.step(nullptr,&tool,1,0,true,pinHand,0,2,1,.01f,metresPerUnit,true,&palms);
       assert(m.physics.forceEvent == c.forceEvent && std::abs(c.target-m.demand)<.001f);
       assert(length(c.tools[1].pose.p - m.shown[1].p) < .0001f);
       return c.forceEvent;
@@ -91,15 +92,17 @@ static void trial(LockStyle style, int driverHand, bool centered, int sign) {
     assert(forceStep(.025f,0) == ForceGesture::None);
     forceStep(.085f,0);
     assert(forceStep(.025f,0) == ForceGesture::Knock);
-    assert(c.tools[1].pose.p.z < driver.pose.p.z-.0025f);
+    const Vec forcedPosition = driver.pose.p - Vec{0,0,.012f/metresPerUnit};
+    assert(length(c.tools[1].pose.p - forcedPosition) < .0001f);
+    assert(length(c.tools[0].pose.p - parked.p) < .0001f);
     assert(forceStep(.075f,0,.008f) == ForceGesture::None); // backing out cancels
     assert(forceStep(.075f,20,.008f) == ForceGesture::None && c.target>0);
     forceStep(.09f,0);
     for (int mm=88; mm>32; mm-=2) assert(forceStep(mm*.001f,0) == ForceGesture::None);
-    // First tap changed the seating depth, so use the actual endcap again.
+    // A second tap can rearm forcing but cannot drive the tool past its first stop.
     bool knocked=false;
     for (int mm=32; mm>=20; --mm) knocked |= forceStep(mm*.001f,0) == ForceGesture::Knock;
-    assert(knocked);
+    assert(knocked && length(c.tools[1].pose.p - forcedPosition) < .0001f);
     assert(forceStep(.021f,12) == ForceGesture::None && c.target == 0);
     forceStep(.085f,12); // establish a fresh angle after separation
     assert(forceStep(.085f,8) == ForceGesture::None);

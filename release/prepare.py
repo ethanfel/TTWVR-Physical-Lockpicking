@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Build a mod-manager-ready TTWVR Physical Lockpicking Beta 0.2 mod from local assets."""
+"""Build a mod-manager-ready TTWVR Physical Lockpicking Beta 0.3 mod from local assets."""
 import argparse
 import hashlib
 import json
@@ -62,7 +62,7 @@ def main():
         parser.error("TTWVR.dll is missing from the supplied TTWVR mod")
     version = SUPPORTED.get(hashlib.sha256(dll.read_bytes()).hexdigest())
     if not version:
-        parser.error("Unsupported TTWVR.dll. Beta 0.2 supports original TTWVR 1.1.6 and 1.1.7.")
+        parser.error("Unsupported TTWVR.dll. Beta 0.3 supports original TTWVR 1.1.6 and 1.1.7.")
     roots = []
     if args.mods:
         roots = [args.mods / row[1:] for row in args.modlist.read_text(encoding="utf-8-sig").splitlines()
@@ -128,7 +128,7 @@ def main():
         shutil.copyfile(SOURCE / "TTWVRPhysicalLockpicking.ini", plugins / "TTWVRPhysicalLockpicking.ini")
         for manifest in (SOURCE / "manifest").glob("*.json"):
             shutil.copyfile(manifest, assets / manifest.name)
-        (mod / "meta.ini").write_text("[General]\nversion=0.2-beta\ncomments=TTWVR Physical Lockpicking Beta 0.2\n", encoding="utf-8")
+        (mod / "meta.ini").write_text("[General]\nversion=0.3-beta\ncomments=TTWVR Physical Lockpicking Beta 0.3\n", encoding="utf-8")
         profiles = json.loads((TOOLS / "target_profiles.json").read_text())
         meshes = mod / "meshes/TTWVRPhysicalLockpicking"
         required = [mod / "TTWVRLockKit.esp", assets / "kit-pinch.bin", assets / "kit-world.bin", assets / "kit-surfaces.bin",
@@ -141,7 +141,7 @@ def main():
         share_identical_images(assets, "*.rgba")
         share_identical_images(mod / "textures/TTWVRPhysicalLockpicking", "*.dds")
         mod.rename(output)
-    print(f"Beta 0.2 prepared in {output}. Enable this mod and TTWVRLockKit.esp and launch TTWVR as usual.")
+    print(f"Beta 0.3 prepared in {output}. Enable this mod and TTWVRLockKit.esp and launch TTWVR as usual.")
 
 
 if __name__ == "__main__":

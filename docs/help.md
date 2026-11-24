@@ -12,14 +12,14 @@ On supported doors and containers, the physical lock stays visible even when you
 
 Look for `TTWVRPhysicalLockpicking.log` under `NVSE/Plugins` in the installed addon or your manager's **Overwrite** folder. Check the entries from your latest launch.
 
-- `plugin_loaded` with `release="Beta 0.2"` identifies the running addon.
+- `plugin_loaded` with `release="Beta 0.3"` identifies the running addon.
 - `host_input_active backend=OpenVR` or `host_input_active backend=OpenXR` identifies the backend selected by TTWVR. The addon uses the same one.
 - If a world lock appears but activation opens the flat minigame, check for `host_input_active` and `native_scene_frame ... applied=1` after activating it. If either is missing, share the addon log and `TTWVR.log` from that launch. In a Virtual Desktop setup, the `runtime` line in `TTWVR.log` identifies which OpenXR runtime handled the session.
 - In the latest `lock_placement` line, `driver=axial-twist` identifies wrist twisting. `direction=clockwise` or `direction=counterclockwise` gives the turn for that door face. An older INI with `ScrewdriverMode=0` selects the sideways push.
 - `live_mount_surfaces loaded=1 kinds=101` confirms the live lock placements loaded.
 - `plugin_bypass disabled=1` means an environment override disabled the addon. Clear `DISABLE_TTWVR_PHYSICAL_LOCKPICKING` and any `TTWVR_PHYSICAL_LOCKPICKING=0` setting.
 
-If the addon INI is missing, Beta 0.2 recreates it at the next launch. Look for `settings_created` in the addon log. A mod manager may put the new file in Overwrite. If the folder is read-only, the addon uses the packaged defaults in memory.
+If the addon INI is missing, Beta 0.3 recreates it at the next launch. Look for `settings_created` in the addon log. A mod manager may put the new file in Overwrite. If the folder is read-only, the addon uses the packaged defaults in memory.
 
 ## Remove the addon
 
