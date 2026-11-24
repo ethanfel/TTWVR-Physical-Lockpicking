@@ -2,7 +2,7 @@
 
 Pick a door, safe or ammo box with both hands in VR. Draw the bobby pin and screwdriver from one holster, bend the pin, then feel the lock resist as you twist the screwdriver.
 
-**[Download the ready-to-play Beta 0.3 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.3/TTWVR-Physical-Lockpicking-Beta-0.3-Ready-to-Play.zip)**
+**[Download the ready-to-play Beta 0.3 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.3-r2/TTWVR-Physical-Lockpicking-Beta-0.3-Ready-to-Play.zip)**
 
 ## Install
 
@@ -22,7 +22,7 @@ The addon takes controller input and haptics from the backend TTWVR selects, inc
 2. Squeeze the **grip** inside the holster sphere and pull your hand out while holding it to draw a pin. Bend the pin with both hands. Use the same grip-and-pull gesture with your free hand for the screwdriver. To move the holster, hold **grip** on the sphere for three seconds, carry it, and release. Grip with the other hand while carrying it to resize.
 3. Seat the pin in the keyhole. Insert the screwdriver alongside the pin and twist. On a door, turn clockwise if the lock is on your left and counterclockwise if it is on your right as you face the door. Centered locks and containers turn clockwise. If you feel resistance, ease off and adjust the pin. A replacement pin keeps the same sweet spot on that lock.
 
-**To force a lock**, seat the screwdriver in twist mode and ease off the torque. Leave the pin parked or stowed. With your free hand open, tap the butt of the handle from behind and draw your hand back. Both controllers pulse as the screwdriver moves another 12 mm into the lock. A fresh 15° twist in the opening direction makes one Fallout **Force Lock** attempt. Pull the screwdriver back to cancel before twisting. A failed attempt can jam the lock.
+**To force a lock**, seat the screwdriver in twist mode and ease off the torque. Leave the pin parked or stowed. With your free hand open, tap the butt of the handle from behind and draw your hand back. A short metallic click and a pulse in both controllers mark the screwdriver seating another 12 mm into the lock. A fresh 15° twist in the opening direction makes one Fallout **Force Lock** attempt. Pull the screwdriver back to cancel before twisting. A failed attempt can jam the lock.
 
 The hovering difficulty label shows **Force Lock** and the starting success percentage when you can attempt it and the chance is above zero. Under `[Ergonomics]`, `EnableForceLock=0` turns off the gesture and its odds display. For testing, set `ForceLockChanceOverride=100` for success or `0` for failure. An explicit zero also appears on the label. Restore `-1` for Fallout’s normal odds and restart after each change.
 

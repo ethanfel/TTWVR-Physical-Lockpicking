@@ -21,13 +21,21 @@ GameState game;
 Control control;
 static bool nativeReady = false;
 static std::atomic<uintptr_t> forcedMenu{0};
-struct ForceRequest { uintptr_t menu = 0, target = 0; uint64_t stamp = 0; };
-static ForceRequest pendingForce;  // guarded by sharedMutex
-void RequestForceLock(const GameState &state) {
+struct ForceRequest {
+  uintptr_t menu = 0, target = 0;
+  uint64_t stamp = 0;
+  bool current(const GameState &state) const {
+    return menu && menu == state.menu && target == state.target && GetTickCount64() - stamp < 250;
+  }
+};
+static ForceRequest pendingForce, pendingSeatSound;  // guarded by sharedMutex
+static void QueueForCurrentLock(const GameState &state, ForceRequest &request) {
   std::lock_guard guard(sharedMutex);
   if (state.menu && state.target && game.menu == state.menu && game.target == state.target)
-    pendingForce = {state.menu,state.target,GetTickCount64()};
+    request = {state.menu,state.target,GetTickCount64()};
 }
+void RequestForceLock(const GameState &state) { QueueForCurrentLock(state, pendingForce); }
+void RequestForceSeatSound(const GameState &state) { QueueForCurrentLock(state, pendingSeatSound); }
 bool NativeReady() { return nativeReady; }
 static uintptr_t gameBase = 0;
 using AxisFn = int(__thiscall *)(void *);
@@ -357,14 +365,16 @@ void __cdecl OnMessage(Message *m) {
     }
   }
   if (forcedMenu.load() != next.menu || next.stage == 2) forcedMenu.store(0);
-  ForceRequest request;
+  ForceRequest request, seatSound;
   {
     std::lock_guard guard(sharedMutex);
     request = pendingForce;
     pendingForce = {};
+    seatSound = pendingSeatSound;
+    pendingSeatSound = {};
   }
-  if (request.menu && request.menu == next.menu && request.target == next.target &&
-      GetTickCount64() - request.stamp < 250 && NativeForceLock(next)) return;
+  if (seatSound.current(next) && next.stage == 2) PlayForceSeatSound();
+  if (request.current(next) && NativeForceLock(next)) return;
   const bool completing = CompleteWorldLock(next);
   // A failed stock force attempt may synchronously close the menu.
   if (completing && *address != next.menu) return;
@@ -427,7 +437,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 103;  // Beta 0.3.
+  p->version = 104;  // Beta 0.3 r2.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -440,7 +450,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=103 release=\"Beta 0.3\" build=force-seat-depth", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=104 release=\"Beta 0.3\" build=force-seat-click", n->runtime);
   const DWORD iniStatus = EnsureDefaultSettings(folder);
   if (iniStatus == ERROR_SUCCESS)
     Log("settings_created file=TTWVRPhysicalLockpicking.ini");

@@ -7,6 +7,7 @@ namespace locks {
 struct MountedCorrection { Vec rawTip, shownTip; Mat turn; bool valid=false; };
 bool IsWorldUnlockPending(uintptr_t ref);
 bool CompleteWorldLock(const GameState &);
+void PlayForceSeatSound();
 void InitWorldLocks(void *scripts, void *arrays, void *commands);
 int HoverLockLevel(unsigned refId);
 void TickVisibleLocks(uintptr_t closeupTarget);

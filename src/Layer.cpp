@@ -1324,6 +1324,7 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
     }
   }
   if (input.forceEvent == ForceGesture::Knock) {
+    RequestForceSeatSound(g);
     KnockFeedback(s,input.screwdriverHand,false);
     Log("force_lock_tap mode=closeup ref=%08x driver=%d",g.targetRefId,input.screwdriverHand);
   }

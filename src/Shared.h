@@ -61,6 +61,7 @@ struct Transform;
 void SampleKitControllers(const Pose (&poses)[2], unsigned valid, unsigned open);
 bool KitControllerWorld(int hand, Transform &world, bool requireOpen = false);
 void RequestForceLock(const GameState &);
+void RequestForceSeatSound(const GameState &);
 bool NativeForceLock(const GameState &);
 bool MountSceneChild(uintptr_t node, uintptr_t parent);
 void RetainSceneNode(uintptr_t node);

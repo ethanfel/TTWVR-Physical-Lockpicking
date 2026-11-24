@@ -134,16 +134,19 @@ void stopTension(unsigned ms) {
   reinterpret_cast<void(__thiscall *)(SoundHandle*,unsigned)>(address(0xad8da0))(&tension,ms);
   tension={};
 }
-void sound(Ptr id,unsigned flags,bool loop=false) {
-  SoundHandle shot;
-  SoundHandle &h=loop ? tension : shot;
-  auto name=reinterpret_cast<const char*>(address(id));
-  if (!Readable(name,24)) return;
+bool playSound(const char *name, unsigned flags, SoundHandle &h, bool loop) {
   reinterpret_cast<void(__thiscall *)(Ptr,SoundHandle*,const char*,unsigned)>(
       address(0xae5680))(address(0x11f6ef0),&h,name,flags);
   if (h.key!=0xffffffff)
     reinterpret_cast<void(__thiscall *)(SoundHandle*,bool)>(address(0xad8830))(&h,loop);
-  Log("live_lock_audio cue=%s handle_valid=%d",name,h.key!=0xffffffff);
+  return h.key != 0xffffffff;
+}
+void sound(Ptr id,unsigned flags,bool loop=false) {
+  auto name = reinterpret_cast<const char *>(address(id));
+  if (!Readable(name,24)) return;
+  SoundHandle shot;
+  bool played = playSound(name,flags,loop ? tension : shot,loop);
+  Log("live_lock_audio cue=%s handle_valid=%d",name,played);
 }
 void playEvents(unsigned events) {
   if (events&Turn) sound(0x10745c4,0x121);
@@ -527,6 +530,13 @@ end)");
   Log("live_witness_support enabled=%d", findWitness != nullptr);
 }
 } // namespace
+void PlayForceSeatSound() {
+  // Play the stock mechanical detent once, through the lock menu's 2D audio path.
+  static constexpr char cue[] = "WPN357RevolverReloadClick";
+  SoundHandle shot;
+  bool played = playSound(cue, 0x101, shot, false);
+  Log("force_lock_seat_audio cue=%s handle_valid=%d", cue, played);
+}
 int HoverLockLevel(unsigned id) {
   // Resolve a fresh form on the game thread; the render thread only passes an ID.
   auto ref = reinterpret_cast<Ptr(__cdecl *)(unsigned)>(address(0x4839c0))(id);
@@ -854,6 +864,7 @@ bool WorldLockFrame(GameState &g, const LiveTool *wire, const Transform *hand,
   static uint64_t lastKnock = 0;
   if (model.physics.forceEvent == ForceGesture::Knock) {
     lastKnock = (now << 1) | unsigned(1-pinHand);
+    PlayForceSeatSound();
     Log("force_lock_tap mode=live ref=%08x driver=%d",active.id,1-pinHand);
   }
   g.worldKnock = lastKnock;
