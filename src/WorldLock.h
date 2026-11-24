@@ -8,6 +8,7 @@ struct MountedCorrection { Vec rawTip, shownTip; Mat turn; bool valid=false; };
 bool IsWorldUnlockPending(uintptr_t ref);
 bool CompleteWorldLock(const GameState &);
 void InitWorldLocks(void *scripts, void *arrays, void *commands);
+int HoverLockLevel(unsigned refId);
 void TickVisibleLocks(uintptr_t closeupTarget);
 DoorTurn CloseupDoorTurn(const GameState &);
 bool ParkLivePin(uintptr_t mesh);

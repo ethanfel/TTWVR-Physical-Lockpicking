@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "KitRuntime.h"
+#include "ForceOdds.h"
 #include "Kit.h"
 #include "HostInput.h"
 #include "WorldPin.h"
@@ -179,6 +180,7 @@ bool init() {
   InstallHostInput(uintptr_t(m), version117);
   InstallHostXrSubmission(uintptr_t(m), version117);
   host = uintptr_t(m) - 0x10000000;
+  InstallForceOdds(host, version117);
   slotQuery = api->compile("begin Function {}\nSetFunctionValue (Call "
                            "(CompileScript \"TTWVRLockKit/Slot.txt\"))\nend");
   stockQuery = api->compile("begin Function {}\nSetFunctionValue "

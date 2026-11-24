@@ -4,6 +4,7 @@ int difficulty
 int currentSkill
 int pins
 int isBlocked
+ref keyForm
 begin Function {lockRef taskNumber}
  SetFunctionValue 0
  if lockRef == 0
@@ -27,7 +28,14 @@ begin Function {lockRef taskNumber}
  if eval difficulty > 100 || difficulty < 0 || currentSkill < difficulty || pins < 1
   return
  endif
- if taskNumber == 1
+ if taskNumber == 3
+  let keyForm := lockRef.GetOpenKey
+  if keyForm
+   if eval player.GetItemCount keyForm > 0
+    return
+   endif
+  endif
+ elseif taskNumber == 1
   SetModLocalData "TTWVRLockKit.Completing" lockRef
   lockRef.Activate player
   SetModLocalData "TTWVRLockKit.Completing" 0

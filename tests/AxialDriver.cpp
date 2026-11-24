@@ -80,6 +80,10 @@ static void trial(LockStyle style, int driverHand, bool centered, int sign) {
       assert(length(c.tools[1].pose.p - m.shown[1].p) < .0001f);
       return c.forceEvent;
     };
+    c.config.enableForceLock = m.physics.config.enableForceLock = false;
+    forceStep(.085f,0);
+    assert(forceStep(.025f,0) == ForceGesture::None);
+    c.config.enableForceLock = m.physics.config.enableForceLock = true;
     assert(forceStep(.025f,0) == ForceGesture::None); // initial overlap
     forceStep(.085f,0);
     palms.open=0; forceStep(.045f,0); // tracking loss, regrip or button press
@@ -329,6 +333,17 @@ int main() {
   door.low.x = -.2f;
   assert(doorTwistDirection(door,false,0) == 1 && doorTwistDirection(door,true,0) == 1);
   cfg.load("FreeScrewdriver=0"); assert(cfg.driverMode == DriverMode::SeatedLever);
+  assert(cfg.enableForceLock && cfg.forceLockChanceOverride == -1);
+  cfg.load("EnableForceLock=0\nForceLockChanceOverride=100");
+  assert(!cfg.enableForceLock && cfg.forceLockChanceOverride == 100);
+  cfg.load("EnableForceLock=1\nForceLockChanceOverride=0");
+  assert(cfg.enableForceLock && cfg.forceLockChanceOverride == 0);
+  cfg.load("ForceLockChanceOverride=37");
+  assert(cfg.forceLockChanceOverride == 37);
+  cfg.load("ForceLockChanceOverride=37.5");
+  assert(cfg.forceLockChanceOverride == -1);
+  cfg.load("ForceLockChanceOverride=101");
+  assert(cfg.forceLockChanceOverride == -1);
   cfg.load("FreeScrewdriver=0\nScrewdriverMode=1"); assert(cfg.driverMode == DriverMode::AxialTwist);
   cfg.load("ScrewdriverMode=0\nFreeScrewdriver=0"); assert(cfg.driverMode == DriverMode::SidePush);
   for (auto style : {LockStyle::Round, LockStyle::Padlock, LockStyle::RoundedSafe})

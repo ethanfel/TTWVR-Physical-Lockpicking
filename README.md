@@ -2,7 +2,7 @@
 
 Pick a door, safe or ammo box with both hands in VR. Draw the bobby pin and screwdriver from one holster, bend the pin, then feel the lock resist as you twist the screwdriver.
 
-**[Download the ready-to-play Beta 0.2 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.2-r15/TTWVR-Physical-Lockpicking-Beta-0.2-Ready-to-Play.zip)**
+**[Download the ready-to-play Beta 0.2 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/beta-0.2-r16/TTWVR-Physical-Lockpicking-Beta-0.2-Ready-to-Play.zip)**
 
 ## Install
 
@@ -23,6 +23,8 @@ The addon takes controller input and haptics from the backend TTWVR selects, inc
 3. Seat the pin in the keyhole. Insert the screwdriver alongside the pin and twist. On a door, turn clockwise if the lock is on your left and counterclockwise if it is on your right as you face the door. Centered locks and containers turn clockwise. If you feel resistance, ease off and adjust the pin. A replacement pin keeps the same sweet spot on that lock.
 
 **To force a lock**, seat the screwdriver in twist mode and ease off the torque. Leave the pin parked or stowed. With your free hand open, tap the butt of the handle from behind and draw your hand back. Both controllers pulse as the blade seats deeper. A fresh 15° twist in the opening direction makes one Fallout **Force Lock** attempt. Pull the screwdriver back to cancel before twisting. A failed attempt can jam the lock.
+
+The hovering difficulty label shows **Force Lock** and the starting success percentage when you can attempt it and the chance is above zero. Under `[Ergonomics]`, `EnableForceLock=0` turns off the gesture and its odds display. For testing, set `ForceLockChanceOverride=100` for success or `0` for failure. An explicit zero also appears on the label. Restore `-1` for Fallout’s normal odds and restart after each change.
 
 A 45° wrist twist requests a full turn. Hold your wrist still to hold your progress, ease it back to reduce pressure, or pull the blade out to release it. To adjust sensitivity, edit `FullTurnWristDegrees` under `[Ergonomics]` in `NVSE/Plugins/TTWVRPhysicalLockpicking.ini`. For the previous sideways push in the lower slot, set `ScrewdriverMode=0`. Restart Fallout after changing the INI. To restore the defaults, close Fallout and delete the addon INI. The addon recreates it on the next launch.
 

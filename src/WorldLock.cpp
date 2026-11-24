@@ -245,6 +245,12 @@ void checkWitness(ULONGLONG now, Ptr pc) {
   markCrime(pc, true);
   reportCrime(pc, witness, 0, 0, 0, owner);
 }
+void ensureWorldAction() {
+  if (!action && api && api->compile)
+    action = api->compile("ref target\nint mode\nbegin Function {target "
+                          "mode}\nSetFunctionValue (Call (CompileScript "
+                          "\"TTWVRLockKit/WorldAction.txt\") target mode)\nend");
+}
 int call(void *code, Ptr ref, unsigned mode) {
   Element out;
   if (!code || !api->call(code, nullptr, nullptr, &out, 2, ref, mode) ||
@@ -521,6 +527,16 @@ end)");
   Log("live_witness_support enabled=%d", findWitness != nullptr);
 }
 } // namespace
+int HoverLockLevel(unsigned id) {
+  // Resolve a fresh form on the game thread; the render thread only passes an ID.
+  auto ref = reinterpret_cast<Ptr(__cdecl *)(unsigned)>(address(0x4839c0))(id);
+  if (!ref || read<unsigned>(ref + 0xc) != id || read<unsigned char>(ref + 4) != 0x3a) return -1;
+  auto base = read<Ptr>(ref + 0x20);
+  auto type = read<unsigned char>(base + 4);
+  if (!base || (type != 0x1b && type != 0x1c)) return -1;
+  ensureWorldAction();
+  return call(action,ref,3) - 1;
+}
 void InitWorldLocks(void *scripts, void *arrayInterface, void *commandTable) {
   commands = static_cast<CommandTable *>(commandTable);
   arrays = static_cast<Arrays *>(arrayInterface);
@@ -710,11 +726,7 @@ bool WorldLockFrame(GameState &g, const LiveTool *wire, const Transform *hand,
     witnessInitialized = true;
     initWitness(); // xNVSE registers script commands after plugin load.
   }
-  if (!action)
-    action =
-        api->compile("ref target\nint mode\nbegin Function {target "
-                     "mode}\nSetFunctionValue (Call (CompileScript "
-                     "\"TTWVRLockKit/WorldAction.txt\") target mode)\nend");
+  ensureWorldAction();
   auto now = GetTickCount64();
   auto pc = player(), cell = read<Ptr>(pc + 0x40);
   if (!cell || !action) {

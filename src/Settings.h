@@ -22,6 +22,8 @@ struct Ergonomics {
   bool useGameProps = true, useGameBackground = true;
   float backgroundBlur = 12.f, backgroundBrightness = .35f;
   bool requirePreparation = true, useHolders = true, dropPins = true;
+  bool enableForceLock = true;
+  int forceLockChanceOverride = -1;
   DriverMode driverMode = DriverMode::AxialTwist;
   float holderSide[2]{-.22f, .22f}, holderBelowEyes[2]{.60f, .60f},
       holderForward[2]{.16f, .16f};
@@ -47,6 +49,13 @@ struct Ergonomics {
       std::istringstream number(line.substr(equal + 1));
       if (!(number >> value) || !std::isfinite(value))
         continue;
+      if (key == "EnableForceLock" && (value == 0 || value == 1))
+        enableForceLock = value == 1;
+      if (key == "ForceLockChanceOverride") {
+        number >> std::ws;
+        forceLockChanceOverride = number.eof() && value >= 0 && value <= 100 &&
+                                  std::floor(value) == value ? int(value) : -1;
+      }
       if (key == "NativeSceneRendering")
         nativeScene = value >= .5f;
       if (key == "MinimumPuzzleLight")

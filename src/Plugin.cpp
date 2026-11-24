@@ -2,6 +2,7 @@
 #include "Interaction.h"
 #include "KitRuntime.h"
 #include "HostInput.h"
+#include "ForceOdds.h"
 #include "MotionShaders.h"
 #include "WorldLock.h"
 #include "NativeScene.h"
@@ -302,7 +303,7 @@ struct StockLockMenu {
 };
 // Same virtual click handler and Force tile used by the stock lock menu.
 bool NativeForceLock(const GameState &state) {
-  if (!nativeReady || !state.menu || !state.target || state.stage != 2 ||
+  if (!ForceAttemptAllowed() || !nativeReady || !state.menu || !state.target || state.stage != 2 ||
       *reinterpret_cast<uintptr_t *>(gameBase + 0xdda204) != state.menu) return false;
   auto table = *reinterpret_cast<uintptr_t **>(state.menu);
   if (uintptr_t(table) != gameBase + 0xc7439c || table[3] != gameBase + 0x390330 ||
@@ -313,6 +314,7 @@ bool NativeForceLock(const GameState &state) {
   Log("force_lock_attempt menu=%08x ref=%08x",unsigned(state.menu),
       *reinterpret_cast<unsigned *>(state.target + 0xc));
   using Click = void(__thiscall *)(uintptr_t,int,uintptr_t);
+  ScopedForceChance chance;
   reinterpret_cast<Click>(table[3])(state.menu,9,tile);
   return true;
 }
@@ -391,6 +393,7 @@ void __cdecl OnMessage(Message *m) {
   next.closeupHiddenParts = hiddenParts;
   UpdateInventory(next);
   TickKit(next);
+  TickForceHover();
   TickVisibleLocks(next.target);
   NativeSceneTick(next);
   std::lock_guard guard(sharedMutex);
@@ -424,7 +427,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 101;  // Beta 0.2, revision 15.
+  p->version = 102;  // Beta 0.2, revision 16.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -437,12 +440,13 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=101 release=\"Beta 0.2\" build=palm-tap-force-lock", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=102 release=\"Beta 0.2\" build=force-lock-odds", n->runtime);
   const DWORD iniStatus = EnsureDefaultSettings(folder);
   if (iniStatus == ERROR_SUCCESS)
     Log("settings_created file=TTWVRPhysicalLockpicking.ini");
   else if (iniStatus != ERROR_ALREADY_EXISTS)
     Log("settings_create_failed win32_error=%lu", iniStatus);
+  ConfigureForceOdds(LoadPlayerSettings(folder));
   InitMotionShaders();
   InitInventory(n->query(6));
   InitKit(n->query(6));

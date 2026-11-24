@@ -784,7 +784,7 @@ public:
     if (config.driverMode == DriverMode::AxialTwist) {
       updateAxialDriver(hands, previous[1], cylinder, acquired, manipulating, wasBlocked[1], dt);
       const int h = driver.owner;
-      if (stage != 2 || !driver.inserted || h < 0 || !palms || !(palms->open & (1u << (1-h))) ||
+      if (!config.enableForceLock || stage != 2 || !driver.inserted || h < 0 || !palms || !(palms->open & (1u << (1-h))) ||
           pin.owner >= 0 || bendHand >= 0 || acquired || insertedEvents || health <= 0 ||
           dot(hands[h].p - driver.seatHand, rotate(driver.seatPose.q,{0,0,1})) * palms->metresPerUnit > .005f) {
         forcing.reset();
