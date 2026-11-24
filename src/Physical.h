@@ -289,7 +289,7 @@ class PhysicalInteraction {
 
 public:
   bool sharedKit = false;
-  unsigned kitNear = 0, kitHandoff = 0;
+  unsigned kitNear = 0, kitHandoff = 0, kitTrigger = 0;
   KitRoles kit;
   TargetBounds targetBounds;
   PhysicalTool tools[2];
@@ -529,7 +529,9 @@ public:
         KitRoles proposed=kit;
         int draw=-1;
         if(sharedKit && manipulating && (handoff || (kitNear & (1u<<h)))) {
-          draw=handoff ? (kit.pinHand==h ? 0 : 1) : proposed.draw(h,inventory>0);
+          int requested = config.drawToolsByButton ? int(!(kitTrigger & (1u << h))) : -1;
+          bool otherReleased = requested >= 0 && tools[1-requested].owner < 0;
+          draw=handoff ? (kit.pinHand==h ? 0 : 1) : proposed.draw(h,inventory>0,requested,otherReleased);
           if(draw>=0 && tools[draw].holstered && (draw==1 || inventory>0)) best=draw;
           else draw=-1;
         }
@@ -551,6 +553,8 @@ public:
         if(draw>=0 && best==draw) {
           kit=proposed;tools[draw].visible=true;
         }
+        if (sharedKit && config.drawToolsByButton)
+          kit.pinHand = best == 0 ? h : 1-h;
         auto &t = tools[best];
         if (best == 0 && t.holstered && config.useHolders && stockPin >= 0) {
           auto stored = box.take(stockPin);

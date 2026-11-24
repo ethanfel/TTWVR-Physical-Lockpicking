@@ -95,7 +95,7 @@ struct Session {
   bool presenting = false, captureInputs = false;
   bool backDown = false, consumeBack = false, triedExit = false;
   unsigned kitCapture = 0, kitArmed = 0;
-  HolsterGrip kitHolster;
+  HolsterPull kitHolster, pinHolster;
   KitControlState kitControls;
   KitWeaponControls kitWeapons;
   std::vector<XrActiveActionSet> activeSets;
@@ -788,14 +788,21 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
   auto &holster = s.kitHolster;
   const unsigned slot = gameplayKit && g.kitSlot && g.kitSlot <= 8 &&
                         g.kitRadii[g.kitSlot-1] > 0 ? g.kitSlot : 0;
-  holster.update(slot,grips,gripActive,valid,inRange,g.kitHands | s.kitCapture,
-                 g.holsterEditing,palms,GetTickCount64());
-  // Trigger pinches still work on the wire and on a parked pin.
-  const unsigned pinch = (g.kitBendNear | g.kitRegrabNear) & ~holster.nativeGrips;
-  const unsigned allowed = pinch | holster.drawn;
+  const auto now = GetTickCount64();
+  const unsigned busy = g.kitHands | s.kitCapture;
+  auto &pinPull = s.pinHolster;
+  holster.update(slot,grips,gripActive,valid,inRange,busy | pinPull.pending | pinPull.drawn,
+                 g.holsterEditing,palms,now);
+  // A trigger press on the wire keeps its existing bend/regrab action. For a
+  // holster pull, reserve the trigger immediately so it cannot fire a weapon.
+  const unsigned pinch = (g.kitBendNear | g.kitRegrabNear) & ~holster.reserved;
+  pinPull.update(g.drawToolsByButton ? slot : 0,triggers,triggerActive,valid,inRange,
+                 busy | grips | holster.reserved | pinch,g.holsterEditing,palms,now,false);
+  const unsigned drawn = holster.drawn | pinPull.drawn;
+  const unsigned allowed = pinch | drawn;
   auto &controls = s.kitControls;
   if (g.menu || !g.kitSlot) controls = {};
-  controls.update(grips & ~holster.nativeGrips,triggers,gripActive,triggerActive,valid,pinch);
+  controls.update(grips & ~(holster.reserved | pinPull.pending),triggers,gripActive,triggerActive,valid,pinch,pinPull.drawn);
   valid = controls.valid;
   unsigned down = controls.down;
   for (int n = 0; n < 2; ++n)
@@ -803,7 +810,7 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
         (!(grips & (1u << n)) || triggerTime[n] < gripTime[n]))
       gripTime[n] = triggerTime[n];
   KitButtons(down,valid,inRange & valid,s.kitPressOrder.update(down,gripTime),
-             controls.uncertainRelease,holster.drawn);
+             controls.uncertainRelease,drawn,pinPull.drawn);
   if(observeKit && succeeded) {
     int driver = g.worldPick>=0 && (g.kitDrawn&2) ? 1-g.worldPick : -1;
     const unsigned inserted=g.worldSeated & ~s.previousSeated;
@@ -837,7 +844,7 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
   // preserve that grip until its release.
   s.kitCapture = gameplayKit ? controls.capture(s.kitCapture, s.kitArmed, allowed, g.kitHands) : 0;
   const unsigned consumed = s.kitWeapons.update(gameplayKit && g.kitHands, grips, triggers,
-                                                gripActive, triggerActive, s.kitCapture, holster.nativeGrips);
+                                                gripActive, triggerActive, s.kitCapture, holster.reserved, pinPull.pending);
   s.kitArmed=valid & ~down;
   if(kitTrace) {
     static unsigned lastRoute=~0u;
@@ -1128,6 +1135,8 @@ bool Input(Session &s, XrTime time, Control &out, Scene &scene,
   input.syncInventory(g.inventoryReady, g.pinCount);
   Vec palms[2]{left.p,right.p};
   input.kitNear=KitReach(g,palms,3);
+  input.kitTrigger = unsigned(triggers[0] >= .65f && squeezes[0] < .55f) |
+                     (unsigned(triggers[1] >= .65f && squeezes[1] < .55f) << 1);
   bool fittedDriver = input.config.driverMode != DriverMode::SeatedLever;
   Pose driverHands[2]{fittedDriver ? driverHandPose(left) : left,
                       fittedDriver ? driverHandPose(right) : right};

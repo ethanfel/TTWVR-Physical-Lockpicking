@@ -21,7 +21,7 @@ struct GameState {
   unsigned kitSlot = 0, kitDrawn = 0, kitHands = 0;
   Vec kitCenters[8]{};
   float kitRadii[8]{};
-  bool kitGameplay = false, holsterEditing = false;
+  bool kitGameplay = false, holsterEditing = false, drawToolsByButton = false;
   Vec kitPalms[2]{}, kitFingerPads[2]{};
   unsigned kitFingerPadsValid = 0;
   unsigned kitPalmsValid = 0;

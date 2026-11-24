@@ -437,7 +437,7 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Query(const locks::Nvse *n,
     return false;
   p->infoVersion = 1;
   p->name = "TTWVR Physical Lockpicking";
-  p->version = 104;  // Beta 0.3 r2.
+  p->version = 105;  // Beta 0.3 r3.
   return n && !n->isEditor && n->version >= 6 && n->runtime == 0x040020d0;
 }
 extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
@@ -450,16 +450,17 @@ extern "C" __declspec(dllexport) bool NVSEPlugin_Load(const locks::Nvse *n) {
     Log("plugin_bypass disabled=1");
     return true;
   }
-  Log("plugin_loaded runtime=%08x probe_only=0 version=104 release=\"Beta 0.3\" build=force-seat-click", n->runtime);
+  Log("plugin_loaded runtime=%08x probe_only=0 version=105 release=\"Beta 0.3\" build=holster-tool-buttons", n->runtime);
   const DWORD iniStatus = EnsureDefaultSettings(folder);
   if (iniStatus == ERROR_SUCCESS)
     Log("settings_created file=TTWVRPhysicalLockpicking.ini");
   else if (iniStatus != ERROR_ALREADY_EXISTS)
     Log("settings_create_failed win32_error=%lu", iniStatus);
-  ConfigureForceOdds(LoadPlayerSettings(folder));
+  const auto settings = LoadPlayerSettings(folder);
+  ConfigureForceOdds(settings);
   InitMotionShaders();
   InitInventory(n->query(6));
-  InitKit(n->query(6));
+  InitKit(n->query(6), settings.drawToolsByButton);
   InitWorldLocks(n->query(6), n->query(5), n->query(3));
   InitNativeScene(n->query(6));
   auto *m = static_cast<Messaging *>(n->query(2));

@@ -4,7 +4,7 @@
     "name": "XR_APILAYER_TTWVR_physical_lockpicking",
     "library_path": "../TTWVRPhysicalLockpicking.dll",
     "api_version": "1.0",
-    "implementation_version": "104",
+    "implementation_version": "105",
     "description": "TTWVR Physical Lockpicking Beta 0.3",
     "enable_environment": "TTWVR_LOCKPICK_CAPTURE_LAYER",
     "disable_environment": "DISABLE_TTWVR_PHYSICAL_LOCKPICKING"

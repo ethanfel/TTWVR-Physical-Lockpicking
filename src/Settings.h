@@ -23,6 +23,7 @@ struct Ergonomics {
   float backgroundBlur = 12.f, backgroundBrightness = .35f;
   bool requirePreparation = true, useHolders = true, dropPins = true;
   bool enableForceLock = true;
+  bool drawToolsByButton = false;
   int forceLockChanceOverride = -1;
   DriverMode driverMode = DriverMode::AxialTwist;
   float holderSide[2]{-.22f, .22f}, holderBelowEyes[2]{.60f, .60f},
@@ -49,6 +50,8 @@ struct Ergonomics {
       std::istringstream number(line.substr(equal + 1));
       if (!(number >> value) || !std::isfinite(value))
         continue;
+      if (key == "DrawToolsByButton" && (value == 0 || value == 1))
+        drawToolsByButton = value == 1;
       if (key == "EnableForceLock" && (value == 0 || value == 1))
         enableForceLock = value == 1;
       if (key == "ForceLockChanceOverride") {

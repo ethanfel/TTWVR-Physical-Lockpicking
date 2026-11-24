@@ -249,19 +249,19 @@ int main() {
     sample(raw,false);
     assert(mounted.pin && mounted.physics.pickHand<0);
     // With the same actually seated pin left in place, drive both presentations
-    // from the same blade samples and native cylinder feedback.
-    {
+    // from the same blade samples and native cylinder feedback. Either hand
+    // can take the driver, including the one that just parked the wire.
+    for (int d : {1-owner, owner}) {
       auto ordinary=close;
       auto live=mounted;
-      int d=1-owner;
       Pose controls[2]{};
-      controls[owner].p={2,2,2};
+      controls[1-d].p={2,2,2};
       auto driverStep=[&](Pose blade,float cylinder,unsigned stage) {
         controls[d]={blade.q,world(blade,handleCenter(1))};
         ordinary.update({},controls[0],controls[1],d==0,d==1,cylinder,1.f/90,stage);
         LiveTool tool{blade.p,rotate(blade.q,{0,0,1}),controls[d].p,
                       rotate(blade.q,{0,1,0}),1,rotate(blade.q,{1,0,0})};
-        live.step(nullptr,&tool,1,0,true,owner,cylinder,stage,1,1.f/90,1,true);
+        live.step(nullptr,&tool,1,0,true,1-d,cylinder,stage,1,1.f/90,1,true);
         assert(live.pin && live.blade==ordinary.tools[1].inserted);
         assert(std::abs(live.pick-ordinary.pick)<.1f);
         assert(std::abs(live.demand-ordinary.target)<.05f);

@@ -395,7 +395,7 @@ void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
     pinPoseReady = false;
     owner = pinHand;
     helper = -1;
-    opening = twist = 0;
+    if (!parked) opening = twist = 0;
     pinRoot = 0;
     meshOpening = -1;
   }

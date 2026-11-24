@@ -352,6 +352,7 @@ uintptr_t lastMenu = 0;
 ULONGLONG nextQuery = 0, nextHolster = 0;
 bool initialized = false, available = false, clean = false;
 bool freshDraw = false;
+bool drawByButton = false;
 void show(int h, int tool, bool value) {
   const auto start = std::chrono::steady_clock::now();
   if (!value) BeforeWorldToolRemoval(h,tool);
@@ -376,7 +377,10 @@ void clearVisuals() {
       show(h, shown[h], false);
 }
 } // namespace
-void InitKit(void *scripts) { api = static_cast<Scripts *>(scripts); }
+void InitKit(void *scripts, bool byButton) {
+  api = static_cast<Scripts *>(scripts);
+  drawByButton = byButton;
+}
 void ResetKit() {
   occupiedHands = 0;
   nextHolster = 0;
@@ -425,9 +429,9 @@ unsigned KitReach(const GameState &g, const Vec hands[2], unsigned valid) {
   }
   return hits;
 }
-void KitButtons(unsigned down, unsigned valid, unsigned inRange, int first, unsigned uncertainRelease, unsigned holsterDraw) {
+void KitButtons(unsigned down, unsigned valid, unsigned inRange, int first, unsigned uncertainRelease, unsigned holsterDraw, unsigned pinDraw) {
   unsigned bits = down | (valid << 2) | (inRange << 4) | (unsigned(first == 1) << 6);
-  sample.store(KitInputSample::make(GetTickCount64(), bits, uncertainRelease, holsterDraw));
+  sample.store(KitInputSample::make(GetTickCount64(), bits, uncertainRelease, holsterDraw, pinDraw));
 }
 bool RequestCloseupExit(uintptr_t menu) {
   if (!menu || !closeLockMenu.load()) return false;
@@ -471,6 +475,7 @@ bool DismissLockMenu(const GameState &g) {
   return true;
 }
 void TickKit(GameState &g) {
+  g.drawToolsByButton = drawByButton;
   if (!initialized) {
     initialized = true;
     available = init();
@@ -601,7 +606,8 @@ void TickKit(GameState &g) {
     interrupted &= ~bit;
     if ((down & bit) && (armed & bit)) {
       armed &= ~bit;
-      if (shown[h] < 0 && NearParkedPin(h, g.worldUnitsPerMeter)) {
+      const bool explicitDraw = drawByButton && (latest.holsterDraw() & bit);
+      if (!explicitDraw && shown[h] < 0 && NearParkedPin(h, g.worldUnitsPerMeter)) {
         show(h, 0, true);
         if (shown[h] == 0) {
           if (RegrabWorldPin(h)) roles.pinHand = h;
@@ -609,7 +615,8 @@ void TickKit(GameState &g) {
         }
       } else if ((latest.holsterDraw() & bit) && shown[h] < 0) {
         auto next = roles;
-        int t = next.draw(h, run(stockQuery) > 0);
+        int requested = drawByButton ? int(!(latest.pinDraw() & bit)) : -1;
+        int t = next.draw(h, requested == 1 || run(stockQuery) > 0, requested, requested == 1 && HasParkedPin());
         if (t >= 0) {
           show(h, t, true);
           if (shown[h] == t)

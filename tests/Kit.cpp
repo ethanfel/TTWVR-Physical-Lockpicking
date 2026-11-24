@@ -41,6 +41,69 @@ static void exercise(int first) {
   q.update({}, hand[0], hand[1], 1, 1, 0);
   assert(q.pickHand == first && q.screwdriverHand == other);
 }
+static void buttonDraws(int h) {
+  const unsigned bit = 1u << h;
+  KitRoles roles;
+  assert(roles.draw(h, false, 1) == 1 && roles.handFor(1) == h);
+  assert(roles.draw(h, true, 0) < 0); // Hands cannot hold both tools at once.
+  assert(roles.draw(1-h, false, 0) < 0);
+  assert(roles.draw(1-h, true, 0) == 0);
+  roles.put(0);
+  roles.put(1);
+  assert(roles.draw(h, true, 0) == 0);
+  assert(roles.draw(1-h, true, 0) < 0);
+  assert(roles.draw(h, true, 1, true) == 1); // Park pin, draw driver with that hand.
+  assert(roles.drawn == 3 && roles.handFor(1) == h && roles.handFor(0) == 1-h);
+  roles.put(1);
+  assert(roles.draw(1-h, true, 1, true) == 1); // Switch driver hands around a parked pin.
+
+  HolsterPull pull;
+  KitControlState controls;
+  KitWeaponControls host;
+  Vec palms[2]{};
+  auto step = [&](unsigned trigger, unsigned near, unsigned tracked, uint64_t now) {
+    pull.update(3,trigger,3,tracked,near,0,false,palms,now,false);
+    controls.update(0,trigger,3,3,tracked,0,pull.drawn);
+    host.update(false,0,trigger,3,3,pull.drawn,0,pull.pending);
+  };
+  step(0,bit,3,1);
+  step(bit,bit,3,2);
+  assert(!controls.down && pull.pending == bit && host.triggerMask == bit && !host.gripMask);
+  step(bit,bit,3,3010); // The trigger cannot start a native holster edit.
+  palms[h].x += .15f;
+  step(bit,0,3,3020);
+  assert(controls.down == bit && pull.drawn == bit);
+  auto sample = KitInputSample::make(3020,0,0,pull.drawn,pull.drawn);
+  assert(sample.pinDraw() == bit && sample.holsterDraw() == bit && sample.time() == 3020);
+  step(0,0,3,3030);
+  assert(!controls.down && !pull.drawn && !host.triggerMask);
+  step(bit,0,3,3040);
+  step(bit,bit,3,3050);
+  assert(!pull.pending && !controls.down && !host.triggerMask);
+  step(0,bit,3,3060);
+  step(bit,bit,3,3070);
+  step(bit,bit,3^bit,3080);
+  palms[h].x += .15f;
+  step(bit,0,3,3090);
+  assert(!pull.drawn && !controls.down); // Tracking loss cannot complete a pull.
+
+  PhysicalInteraction p;
+  p.config.useHolders = false;
+  p.config.load("DrawToolsByButton=1");
+  assert(p.config.drawToolsByButton);
+  p.sharedKit = true;
+  p.kitNear = bit;
+  p.syncInventory(true, 4);
+  Pose hands[2]{};
+  p.update({},hands[0],hands[1],0,0,0);
+  const float l = h == 0, r = h == 1;
+  p.update({},hands[0],hands[1],l,r,0);
+  assert(p.screwdriverHand == h && p.pickHand < 0);
+  p.update({},hands[0],hands[1],0,0,0);
+  p.kitTrigger = bit;
+  p.update({},hands[0],hands[1],l,r,0);
+  assert(p.pickHand == h && p.screwdriverHand < 0);
+}
 int main() {
   KitWeaponControls weapons;
   assert(weapons.update(false, 0, 1, 3, 3) == 0);
@@ -75,6 +138,10 @@ int main() {
 
   exercise(0);
   exercise(1);
+  buttonDraws(0);
+  buttonDraws(1);
+  Ergonomics stock;
+  assert(!stock.drawToolsByButton);
   const auto sample=KitInputSample::make(1000,0x6b);
   assert(sample.buttons()==0x6b && sample.fresh(999) && sample.fresh(1180));
   assert(!sample.fresh(1181) && !KitInputSample{}.fresh(0));
@@ -108,7 +175,7 @@ int main() {
   }
   for (unsigned hand : {1u, 2u}) {
     const unsigned other = 3u ^ hand;
-    HolsterGrip holster;
+    HolsterPull holster;
     KitControlState input;
     KitWeaponControls host;
     Vec poses[2]{};
@@ -117,19 +184,19 @@ int main() {
     auto tick = [&](unsigned grips, unsigned triggers, unsigned near, bool editing = false,
                     unsigned active = 3, unsigned tracked = 3, unsigned slot = 4) {
       holster.update(slot, grips, active, tracked, near, 0, editing, poses, now++);
-      input.update(grips & ~holster.nativeGrips, triggers, active, 3, tracked, 0);
-      host.update(holster.drawn != 0, grips, triggers, active, 3, holster.drawn, holster.nativeGrips);
+      input.update(grips & ~holster.reserved, triggers, active, 3, tracked, 0);
+      host.update(holster.drawn != 0, grips, triggers, active, 3, holster.drawn, holster.reserved);
     };
     tick(0, 0, hand);
     tick(0, hand, hand);  // Trigger alone never draws.
     assert(!input.down && !holster.drawn);
     tick(hand, hand, hand);
-    assert(holster.nativeGrips == hand && !input.down && !holster.drawn);
+    assert(holster.reserved == hand && !input.down && !holster.drawn);
     tick(hand, 0, 0);  // A moving sphere alone cannot draw from a stationary hand.
     assert(!holster.drawn);
     poses[h].x += .12f;
     tick(hand, 0, 0);
-    assert(input.down == hand && holster.drawn == hand && !holster.nativeGrips);
+    assert(input.down == hand && holster.drawn == hand && !holster.reserved);
     tick(3, 0, other);
     assert(!host.blockedHands(other, 0) && holster.drawn == hand);
     poses[o].x += .12f;
@@ -146,9 +213,9 @@ int main() {
     tick(hand, 0, 0);
     assert(!holster.drawn && !host.blockedHands(hand, 0));
     tick(3, other, 0, true);
-    assert(holster.nativeGrips == 3 && !input.down && !holster.drawn);
+    assert(holster.reserved == 3 && !input.down && !holster.drawn);
     tick(other, 0, 0);
-    assert(holster.nativeGrips == other && !holster.drawn);
+    assert(holster.reserved == other && !holster.drawn);
     tick(0, 0, 0);
     tick(hand, 0, 0);
     tick(hand, 0, hand);

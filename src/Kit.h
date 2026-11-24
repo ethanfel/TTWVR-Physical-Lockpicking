@@ -19,13 +19,13 @@ struct KitWeaponControls {
 
   unsigned update(bool toolsOut, unsigned grips, unsigned triggers,
                   unsigned gripActive, unsigned triggerActive, unsigned kitCapture = 0,
-                  unsigned nativeGrips = 0) {
+                  unsigned nativeGrips = 0, unsigned reservedTriggers = 0) {
     const unsigned captured = toolsOut ? 3u : kitCapture;
     // Only an active reading of the same button can confirm its release.
     gripsToRelease = ((gripsToRelease & (grips | ~gripActive)) | (grips & captured)) & ~nativeGrips;
-    triggersToRelease = (triggersToRelease & (triggers | ~triggerActive)) | (triggers & captured);
+    triggersToRelease = (triggersToRelease & (triggers | ~triggerActive)) | (triggers & (captured | reservedTriggers));
     gripMask = (captured & ~nativeGrips) | gripsToRelease;
-    triggerMask = captured | triggersToRelease;
+    triggerMask = captured | reservedTriggers | triggersToRelease;
     return gripMask | triggerMask;
   }
 
@@ -37,13 +37,14 @@ struct KitWeaponControls {
 // Publish the button bits and their sample time together across XR/game threads.
 struct KitInputSample {
   uint64_t packed = 0;
-  static KitInputSample make(uint64_t time, unsigned bits, unsigned uncertain = 0, unsigned draw = 0) {
-    return {(time << 12) | ((draw & 3u) << 10) | ((uncertain & 3u) << 7) | (bits & 0x7fu) | 0x200u};
+  static KitInputSample make(uint64_t time, unsigned bits, unsigned uncertain = 0, unsigned draw = 0, unsigned pinDraw = 0) {
+    return {(time << 14) | ((pinDraw & draw & 3u) << 12) | ((draw & 3u) << 10) | ((uncertain & 3u) << 7) | (bits & 0x7fu) | 0x200u};
   }
   unsigned buttons() const { return unsigned(packed & 0x7fu); }
   unsigned uncertainRelease() const { return unsigned(packed >> 7) & 3u; }
   unsigned holsterDraw() const { return unsigned(packed >> 10) & 3u; }
-  uint64_t time() const { return packed >> 12; }
+  unsigned pinDraw() const { return unsigned(packed >> 12) & 3u; }
+  uint64_t time() const { return packed >> 14; }
   bool fresh(uint64_t now) const {
     auto time = this->time();
     return packed && (time >= now || now - time <= 180);
@@ -52,43 +53,44 @@ struct KitInputSample {
 
 // A grip started on a numbered sphere belongs to TTWVR until the hand
 // withdraws. A completed native edit owns both the carry and resize grips.
-struct HolsterGrip {
-  unsigned slot = 0, ready = 0, pending = 0, nativeGrips = 0, drawn = 0;
+struct HolsterPull {
+  unsigned slot = 0, ready = 0, pending = 0, reserved = 0, drawn = 0;
   uint64_t started[2]{};
   Vec origin[2]{};
 
-  void update(unsigned activeSlot, unsigned grips, unsigned active, unsigned tracked,
-              unsigned inRange, unsigned busy, bool editing, const Vec (&hands)[2], uint64_t now) {
+  void update(unsigned activeSlot, unsigned buttons, unsigned active, unsigned tracked,
+              unsigned inRange, unsigned busy, bool editing, const Vec (&hands)[2], uint64_t now,
+              bool canReposition = true) {
     if (slot != activeSlot) {
       slot = activeSlot;
       pending = drawn = ready = 0;
     }
-    const unsigned pressed = ready & grips & active & tracked;
-    ready = (ready & ~active) | (active & tracked & ~grips);
-    nativeGrips &= grips | ~active;
-    drawn &= grips | ~active;
-    pending &= grips & active & tracked;
+    const unsigned pressed = ready & buttons & active & tracked;
+    ready = (ready & ~active) | (active & tracked & ~buttons);
+    reserved &= buttons | ~active;
+    drawn &= buttons | ~active;
+    pending &= buttons & active & tracked;
     if (!slot) return;
     if (editing) {
       pending = 0;
-      nativeGrips |= grips & ~busy & ~drawn;
+      reserved |= buttons & ~busy & ~drawn;
       return;
     }
-    const unsigned begin = pressed & inRange & ~busy & ~nativeGrips;
+    const unsigned begin = pressed & inRange & ~busy & ~reserved;
     pending |= begin;
-    nativeGrips |= begin;
+    reserved |= begin;
     for (unsigned hand = 0; hand < 2; ++hand) {
       const unsigned bit = 1u << hand;
       if (!(pending & bit)) continue;
       if (begin & bit) {
         started[hand] = now;
         origin[hand] = hands[hand];
-      } else if (now - started[hand] >= 3000) {
+      } else if (canReposition && now - started[hand] >= 3000) {
         // Leave the grip with the host even if its edit flag arrives a frame late.
         pending &= ~bit;
       } else if (!(inRange & bit) && length(hands[hand] - origin[hand]) >= .025f) {
         pending &= ~bit;
-        nativeGrips &= ~bit;
+        reserved &= ~bit;
         drawn |= bit;
       }
     }
@@ -101,11 +103,11 @@ struct KitControlState {
   unsigned heldGrips = 0, heldTriggers = 0, previousTriggers = 0;
   unsigned down = 0, valid = 0, uncertainRelease = 0;
   void update(unsigned grips, unsigned triggers, unsigned gripActive,
-              unsigned triggerActive, unsigned tracked, unsigned allowed) {
+              unsigned triggerActive, unsigned tracked, unsigned allowed, unsigned pulledTriggers = 0) {
     const unsigned wasHeld = heldGrips | heldTriggers;
     heldGrips = grips | (heldGrips & ~gripActive);
     heldTriggers = (heldTriggers & ~triggerActive) |
-                   (triggers & (heldTriggers | (allowed & tracked & ~previousTriggers)));
+                   (triggers & (heldTriggers | pulledTriggers | (allowed & tracked & ~previousTriggers)));
     previousTriggers = triggers | (previousTriggers & ~triggerActive);
     const unsigned confirmed = grips | (triggers & heldTriggers);
     const unsigned unknown = (heldGrips & ~gripActive) | (heldTriggers & ~triggerActive);
@@ -136,19 +138,22 @@ struct KitPressOrder {
   }
 };
 
-// A role belongs to a hand until the last tool goes home. A broken or
-// dropped pin never changes the screwdriver hand.
+// The two held tools always occupy different hands. In pin-first mode the
+// first hand keeps its role until both tools return to the kit.
 struct KitRoles {
   int pinHand = -1;
   unsigned drawn = 0; // bit 0 pin, bit 1 screwdriver
-  int draw(int hand, bool pins) {
+  int draw(int hand, bool pins, int requested = -1, bool otherToolReleased = false) {
     if (hand < 0 || hand > 1)
       return -1;
-    int tool = pinHand < 0 || pinHand == hand ? 0 : 1;
-    if ((drawn & (1u << tool)) || (tool == 0 && !pins))
+    int tool = requested < 0 ? int(pinHand >= 0 && pinHand != hand) : requested;
+    if (tool > 1 || (drawn & (1u << tool)) || (tool == 0 && !pins))
       return -1;
-    if (pinHand < 0)
-      pinHand = hand;
+    int nextPinHand = tool == 0 ? hand : 1 - hand;
+    // A released tool (including a wire parked in the lock) leaves its former hand free.
+    if (drawn && pinHand != nextPinHand && !otherToolReleased)
+      return -1;
+    pinHand = nextPinHand;
     drawn |= 1u << tool;
     return tool;
   }
