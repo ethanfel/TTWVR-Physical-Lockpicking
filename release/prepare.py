@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Build a mod-manager-ready TTWVR Physical Lockpicking 1.1.8-r1 mod from local assets."""
+"""Build a mod-manager-ready TTWVR Physical Lockpicking 1.1.8-r2 mod from local assets."""
 import argparse
 import hashlib
 import json
@@ -66,7 +66,7 @@ def main():
         parser.error("TTWVR.dll is missing from the supplied TTWVR mod")
     version = SUPPORTED.get(hashlib.sha256(dll.read_bytes()).hexdigest())
     if not version:
-        parser.error("Unsupported TTWVR.dll. 1.1.8-r1 supports TTWVR 1.1.6, 1.1.7 and 1.1.8.")
+        parser.error("Unsupported TTWVR.dll. 1.1.8-r2 supports TTWVR 1.1.6, 1.1.7 and 1.1.8.")
     roots = []
     if args.mods:
         roots = [args.mods / row[1:] for row in args.modlist.read_text(encoding="utf-8-sig").splitlines()
@@ -132,7 +132,7 @@ def main():
         shutil.copyfile(SOURCE / "TTWVRPhysicalLockpicking.ini", plugins / "TTWVRPhysicalLockpicking.ini")
         for manifest in (SOURCE / "manifest").glob("*.json"):
             shutil.copyfile(manifest, assets / manifest.name)
-        (mod / "meta.ini").write_text("[General]\nversion=1.1.8-r1\ncomments=TTWVR Physical Lockpicking 1.1.8-r1\n", encoding="utf-8")
+        (mod / "meta.ini").write_text("[General]\nversion=1.1.8-r2\ncomments=TTWVR Physical Lockpicking 1.1.8-r2\n", encoding="utf-8")
         profiles = json.loads((TOOLS / "target_profiles.json").read_text())
         meshes = mod / "meshes/TTWVRPhysicalLockpicking"
         required = [mod / "TTWVRLockKit.esp", assets / "kit-pinch.bin", assets / "kit-world.bin", assets / "kit-surfaces.bin",
@@ -145,7 +145,7 @@ def main():
         share_identical_images(assets, "*.rgba")
         share_identical_images(mod / "textures/TTWVRPhysicalLockpicking", "*.dds")
         mod.rename(output)
-    print(f"1.1.8-r1 prepared in {output}. Enable this mod and TTWVRLockKit.esp and launch TTWVR as usual.")
+    print(f"1.1.8-r2 prepared in {output}. Enable this mod and TTWVRLockKit.esp and launch TTWVR as usual.")
 
 
 if __name__ == "__main__":

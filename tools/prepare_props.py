@@ -74,6 +74,38 @@ def normals(p, triangles):
     return n
 
 
+def separate_can_lining(p, tri, normal):
+    # The vanilla can has two coincident shells with opposite winding. Only
+    # inset doubled interior faces; a replacement with real thickness needs none.
+    faces = p[tri]
+    _, vertex_ids = np.unique(p, axis=0, return_inverse=True)
+    _, groups, counts = np.unique(
+        np.sort(vertex_ids[tri], axis=1), axis=0, return_inverse=True, return_counts=True
+    )
+    face_normals = np.cross(faces[:, 1] - faces[:, 0], faces[:, 2] - faces[:, 0])
+    center = faces.mean(axis=1)
+    radial = center[:, 0] * face_normals[:, 0] + center[:, 2] * face_normals[:, 2]
+    floor = np.ptp(faces[:, :, 1], axis=1) < 1e-7
+    inward = np.where(floor, face_normals[:, 1] > 0, radial < 0)
+    inward_count = np.bincount(groups, weights=inward)
+    inside = inward & (counts[groups] == 2) & (inward_count[groups] == 1)
+    ids = np.setdiff1d(tri[inside], tri[~inside])
+    if not len(ids):
+        return
+    top = p[:, 1].max()
+    height = np.ptp(p[:, 1])
+    radius = np.ptp(p[:, 0]) / 2
+
+    def inset(v):
+        depth = top - v[:, 1]
+        # Join the two shells at the lip. Lift the inside floor off the base.
+        width = 1 - (.0008 / radius) * np.clip(depth / .002, 0, 1)
+        return np.column_stack((v[:, 0] * width, v[:, 1] + .00035 * depth / height, v[:, 2] * width))
+
+    normal[ids] = warped_normals(p[ids], normal[ids], inset)
+    p[ids] = inset(p[ids])
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--data", type=Path, required=True)
@@ -252,9 +284,14 @@ def main():
         return (np.asarray(v) - hinge) @ rotation.T + hinge
 
     for face in tri:
+        is_lid = np.all(source[face, 2] > hi[2] - 0.001)
+        # The axis conversion mirrors the source. Restore exterior winding;
+        # the raised lid displays its inside, toward the tray and its label.
+        if not is_lid:
+            face = face[[0, 2, 1]]
         v = p[face].copy()
         u = uv[face].copy()
-        if np.all(source[face, 2] > hi[2] - 0.001):
+        if is_lid:
             # The raised lid's interior is red; its original label is laid out
             # at a readable aspect ratio on the inside below.
             u = np.column_stack(
@@ -267,8 +304,10 @@ def main():
         points.extend(v)
         tex.extend(u)
 
-    def quad(v, uvs):
+    def quad(v, uvs, reverse=False):
         for indices in [(0, 1, 2), (0, 2, 3)]:
+            if reverse:
+                indices = indices[::-1]
             points.extend(np.asarray(v)[list(indices)])
             tex.extend(np.asarray(uvs)[list(indices)])
 
@@ -281,6 +320,7 @@ def main():
             [-0.025, -0.098, 0.022],
         ],
         red,
+        reverse=True,  # The tray floor faces up.
     )
     for x in [-0.025, 0.025]:
         quad(
@@ -291,6 +331,7 @@ def main():
                 [x, -0.098, 0.022],
             ],
             red,
+            reverse=x > 0,  # Face into the tray.
         )
     for z in [-0.084, 0.022]:
         quad(
@@ -301,6 +342,7 @@ def main():
                 [-0.025, -0.025, z],
             ],
             red,
+            reverse=z > 0,
         )
     label = lid(
         [
@@ -322,14 +364,22 @@ def main():
     lo, hi = p.min(0), p.max(0)
     # Remove a possible top cap, leaving the existing rim and hollow walls.
     tri = tri[~np.all(p[tri, 2] > hi[2] - 0.05, axis=1)]
-    p = np.column_stack(
-        [
-            (p[:, 0] - (lo[0] + hi[0]) / 2) * 0.064 / (hi[0] - lo[0]),
-            -0.155 + (p[:, 2] - lo[2]) * 0.130 / (hi[2] - lo[2]),
-            (p[:, 1] - (lo[1] + hi[1]) / 2) * 0.064 / (hi[1] - lo[1]),
-        ]
-    )
-    add("driver_can", p, uv, tri, 2)
+
+    def can_transform(v):
+        return np.column_stack(
+            [
+                (v[:, 0] - (lo[0] + hi[0]) / 2) * 0.064 / (hi[0] - lo[0]),
+                -0.155 + (v[:, 2] - lo[2]) * 0.130 / (hi[2] - lo[2]),
+                (v[:, 1] - (lo[1] + hi[1]) / 2) * 0.064 / (hi[1] - lo[1]),
+            ]
+        )
+
+    # Swapping Y and Z reverses winding. Keep the stock shading normals on
+    # both sides of the hollow wall, transformed for the new dimensions.
+    can_normals = warped_normals(p, source_normals(can, "L_TinCan01:8"), can_transform)
+    p, tri = can_transform(p), tri[:, [0, 2, 1]]
+    separate_can_lining(p, tri, can_normals)
+    add("driver_can", p, uv, tri, 2, normal=can_normals)
     a.output.mkdir(parents=True, exist_ok=True)
     with (a.output / "props.bin").open("wb") as f:
         f.write(b"TTWProp5")
