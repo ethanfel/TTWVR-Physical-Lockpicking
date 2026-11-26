@@ -80,7 +80,7 @@ void ConfigureForceOdds(const Ergonomics &settings) {
   trace = GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE", nullptr, 0) != 0;
 }
 
-void InstallForceOdds(uintptr_t hostBias, bool version117) {
+void InstallForceOdds(uintptr_t host, HostLayout::Call hoverText) {
   if (!enabled) return;
   exe = uintptr_t(GetModuleHandleW(nullptr));
   auto site = exe + 0x3903d9;
@@ -120,11 +120,11 @@ void InstallForceOdds(uintptr_t hostBias, bool version117) {
     overrideInstalled = InstallVerifiedCalls(&roll,1);
     if (!overrideInstalled) return;
   }
-  // In both supported hosts the floating activation panel copies HUD tile 33
+  // In the supported hosts the floating activation panel copies HUD tile 33
   // here, including when the hand points away from the camera's crosshair.
-  auto reader = hostBias + (version117 ? 0x1011d5a0u : 0x1011ca70u);
+  auto reader = host + hoverText.target;
   originalText = reinterpret_cast<TileText>(reader);
-  const NativeCall hover{hostBias + (version117 ? 0x101379beu : 0x10136b3eu),
+  const NativeCall hover{host + hoverText.site,
                          reader, reinterpret_cast<void *>(difficultyText)};
   hoverInstalled = InstallVerifiedCalls(&hover,1);
   Log("force_lock_odds hover=%d override=%d roll_hook=%d",hoverInstalled,configuredChance,overrideInstalled);

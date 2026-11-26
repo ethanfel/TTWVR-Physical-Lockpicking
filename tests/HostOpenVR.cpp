@@ -86,12 +86,12 @@ void ProcessHostInput(void *backend,HostPulse pulse,HostFrame &frame,bool valid,
 }
 int wmain(int argc,wchar_t **argv) {
   using namespace locks;
-  if ((argc != 3 && argc != 4) || (wcscmp(argv[1],L"116") && wcscmp(argv[1],L"117"))) return 2;
+  if ((argc != 3 && argc != 4) || (wcscmp(argv[1],L"116") && wcscmp(argv[1],L"117") && wcscmp(argv[1],L"118"))) return 2;
   const bool direct = argc == 4 && wcscmp(argv[3], L"direct") == 0;
   const bool wrapped = argc == 4 && wcscmp(argv[3], L"wrapped") == 0;
   const bool mixed = argc == 4 && wcscmp(argv[3], L"mixed") == 0;
   if (argc == 4 && !direct && !wrapped && !mixed) return 2;
-  bool newer=wcscmp(argv[1],L"117")==0;
+  const auto &build = !wcscmp(argv[1],L"118") ? host118 : !wcscmp(argv[1],L"117") ? host117 : host116;
   HMODULE host=LoadLibraryW(argv[2]);
   if (!host) { std::printf("LoadLibrary failed %lu\n",GetLastError()); return 3; }
   void *systemTable[40]{}, *compositorTable[3]{};
@@ -100,9 +100,26 @@ int wmain(int argc,wchar_t **argv) {
   void **system=systemTable, **compositor=compositorTable;
   void *backend[256]{};
   const auto base=reinterpret_cast<uintptr_t>(host);
-  auto **table=reinterpret_cast<void **>(base+(newer ? 0xaf36d0 : 0xad7e40));
+  // Check the actual host instructions for all live and close-up integrations,
+  // including the ones a controller-only test cannot exercise in a game scene.
+  auto checkCall = [base](HostLayout::Call call) {
+    auto *instruction = reinterpret_cast<const unsigned char *>(base + call.site);
+    assert(instruction[0] == 0xe8);
+    int32_t rel;
+    std::memcpy(&rel, instruction + 1, sizeof(rel));
+    assert(call.site + 5 + rel == call.target);
+  };
+  for (auto call : {build.endFrame, build.center, build.restoreHand, build.sleeve,
+                    build.autoWrist, build.hover, build.inventory.commit}) checkCall(call);
+  for (unsigned site : build.lootSites) checkCall({site, build.lootPreference});
+  const auto *gate = reinterpret_cast<const unsigned char *>(base + build.inventory.gate);
+  uintptr_t tab;
+  std::memcpy(&tab, gate + 6, sizeof(tab));
+  assert(std::memcmp(gate, "\x85\xf6\x74\x32\x83\x3d", 6) == 0 && tab == base + build.inventory.tab);
+  assert(std::memcmp(gate + 10, "\x03\x7c\x29", 3) == 0);
+  auto **table=reinterpret_cast<void **>(base+build.openVR.table);
   backend[0]=table; backend[7]=&system; backend[8]=&compositor;
-  auto **xrTable = reinterpret_cast<void **>(base + (newer ? 0xaf3568 : 0xad7cd8));
+  auto **xrTable = reinterpret_cast<void **>(base + build.openXR.table);
   if (direct) {
     for (auto **methods : {table, xrTable}) {
       DWORD old = 0, ignored = 0;
@@ -131,13 +148,13 @@ int wmain(int argc,wchar_t **argv) {
     }
   }
   auto *xrOriginal = xrTable[6];
-  assert(InstallHostInput(base,newer));
-  assert(InstallHostInput(base,newer));  // Retrying must not deliver a frame twice.
+  assert(InstallHostInput(base,build));
+  assert(InstallHostInput(base,build));  // Retrying must not deliver a frame twice.
   assert((xrTable[6] == xrOriginal) == (wrapped || mixed));
   auto poll=reinterpret_cast<Poll>(table[6]);
   if (wrapped || mixed) {
     if (wrapped) assert(table[6] == reinterpret_cast<void *>(forwardPoll<0>));
-    auto *call = reinterpret_cast<unsigned char *>(base + (newer ? 0x6fb69b : 0x6e43fb));
+    auto *call = reinterpret_cast<unsigned char *>(base + build.dispatch + 3);
     assert(call[0] == 0xe8);
     int32_t displacement;
     std::memcpy(&displacement, call + 1, sizeof(displacement));

@@ -7,17 +7,6 @@
 namespace locks {
 namespace {
 using Poll = bool (__thiscall *)(void *, HostFrame *);
-struct Backend {
-  unsigned table, poll, pollBody, pulse, pulseBody;
-};
-// Each supported TTWVR method has a linker entry and a direct implementation.
-constexpr Backend openVR[]{
-    {0xad7e40, 0x38b4, 0x6b46e0, 0x225de, 0x6b1ef0},
-    {0xaf36d0, 0x38e6, 0x6cb930, 0x22868, 0x6c9140}};
-constexpr Backend openXR[]{
-    {0xad7cd8, 0x2335d, 0x6d8e70, 0x3edb, 0x6c71a0},
-    {0xaf3568, 0x23600, 0x6f00d0, 0x3f0d, 0x6de400}};
-
 template<bool isOpenVR> struct Adapter {
   static inline Poll original = nullptr;
   static inline HostPulse pulse = nullptr;
@@ -26,7 +15,7 @@ template<bool isOpenVR> struct Adapter {
     if (frame) ProcessHostInput(self, pulse, *frame, valid, isOpenVR);
     return valid;
   }
-  static bool install(uintptr_t image, Backend entry) {
+  static bool install(uintptr_t image, HostLayout::Backend entry) {
     auto slots = reinterpret_cast<void **>(image + entry.table);
     const char *name = isOpenVR ? "OpenVR" : "OpenXR";
     void *expected = slots[6];
@@ -68,10 +57,10 @@ bool __fastcall pollDispatch(void *backend, void *, HostFrame *frame) {
   return valid;
 }
 
-bool installDispatch(uintptr_t image, bool version117) {
+bool installDispatch(uintptr_t image, unsigned dispatch) {
   // This aligned eight-byte group ends at the instruction testing the poll result.
   // Keep the frame argument and vtable load; replace only the five-byte method call.
-  const uintptr_t block = image + (version117 ? 0x6fb698 : 0x6e43f8);
+  const uintptr_t block = image + dispatch;
   constexpr unsigned char original[8]{0x52, 0x8b, 0x01, 0x8b, 0x40, 0x18, 0xff, 0xd0};
   unsigned char replacement[8]{0x52, 0x8b, 0x01, 0xe8};
   const uint32_t relative = reinterpret_cast<uintptr_t>(pollDispatch) - (block + 8);
@@ -98,14 +87,14 @@ bool installDispatch(uintptr_t image, bool version117) {
   return installed;
 }
 }
-bool InstallHostInput(uintptr_t image, bool version117) {
-  const bool vr = Adapter<true>::install(image, openVR[version117]);
-  const bool xr = Adapter<false>::install(image, openXR[version117]);
+bool InstallHostInput(uintptr_t image, const HostLayout &build) {
+  const bool vr = Adapter<true>::install(image, build.openVR);
+  const bool xr = Adapter<false>::install(image, build.openXR);
   bool dispatch = false;
   if (!vr || !xr) {
-    dispatchOpenVR = vr ? nullptr : reinterpret_cast<void **>(image + openVR[version117].table);
-    dispatchOpenXR = xr ? nullptr : reinterpret_cast<void **>(image + openXR[version117].table);
-    dispatch = installDispatch(image, version117);
+    dispatchOpenVR = vr ? nullptr : reinterpret_cast<void **>(image + build.openVR.table);
+    dispatchOpenXR = xr ? nullptr : reinterpret_cast<void **>(image + build.openXR.table);
+    dispatch = installDispatch(image, build.dispatch);
     if (dispatch) Log("host_input_dispatch installed=1 openvr=%d openxr=%d", !vr, !xr);
   }
   Log("host_input_installed openvr=%d openxr=%d", vr || dispatch, xr || dispatch);

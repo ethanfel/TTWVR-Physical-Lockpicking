@@ -66,12 +66,12 @@ void __cdecl assignWrist(void *player, int index) {
 }
 } // namespace
 
-bool InstallWristPinFavourite(uintptr_t base, bool version117) {
-  const uintptr_t gate = base + (version117 ? 0x13d31a : 0x13c49a);
-  wristTab = reinterpret_cast<const int *>(base + (version117 ? 0x124a954 : 0x122e7b4));
-  wristSelection = reinterpret_cast<const void *const *>(base + (version117 ? 0x124a990 : 0x122e7f0));
-  wristCommit = reinterpret_cast<WristCommit>(base + (version117 ? 0x13ad90 : 0x139f10));
-  const NativeCall commitHook{base + (version117 ? 0x13fd4d : 0x13ea9d),
+bool InstallWristPinFavourite(uintptr_t base, const HostLayout::WristInventory &inventory) {
+  const uintptr_t gate = base + inventory.gate;
+  wristTab = reinterpret_cast<const int *>(base + inventory.tab);
+  wristSelection = reinterpret_cast<const void *const *>(base + inventory.selection);
+  wristCommit = reinterpret_cast<WristCommit>(base + inventory.commit.target);
+  const NativeCall commitHook{base + inventory.commit.site,
                               uintptr_t(wristCommit), reinterpret_cast<void *>(assignWrist)};
 
   // Original i386 gate: null row or category < 3 follows the native accept path.

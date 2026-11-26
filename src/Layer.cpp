@@ -2203,12 +2203,12 @@ XrResult XRAPI_CALL Create(const XrInstanceCreateInfo *c,
   return r;
 }
 } // namespace
-void InstallHostXrSubmission(uintptr_t image, bool version117) {
+void InstallHostXrSubmission(uintptr_t image, HostLayout::Call endFrame) {
   // The supported TTWVR builds call their loader here after composing all layers.
   // This route needs neither an API layer registration nor a runtime change.
-  const uintptr_t original = image + (version117 ? 0x21e5e : 0x21bd9);
+  const uintptr_t original = image + endFrame.target;
   hostEndFrame = reinterpret_cast<PFN_xrEndFrame>(original);
-  const NativeCall call{image + (version117 ? 0x6dbf94 : 0x6c4d34), original,
+  const NativeCall call{image + endFrame.site, original,
                         reinterpret_cast<void *>(SubmitHostFrame)};
   Log("host_xr_lock_submission installed=%d", InstallVerifiedCalls(&call, 1));
 }

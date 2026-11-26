@@ -69,10 +69,7 @@ const LootPreference *__cdecl kitLootPreference() {
 }
 void *visual[2][2][2]{};
 uintptr_t host = 0;
-struct Layout {
-  unsigned bones, hands, bindings, positions, enabled, ready, units, editors;
-};
-Layout layout{};
+HostLayout::Holsters layout{};
 // TTWVR computes all eight world-space centers for its holster hit tests,
 // including body-relative slots when the avatar skeleton is unavailable.
 using ResolveCenter = Vec *(__cdecl *)(Vec *, const float *, const Vec *, const Vec *, float);
@@ -160,27 +157,17 @@ bool init() {
   if (!m || !api || !api->compile || !api->call)
     return false;
   auto digest = hashFile(m);
-  // Read-only bone and slot layouts shared with the private holster
-  // calibration.
-  const bool version117 = digest ==
-      "119a085a5b0101f0618b8e076a421b4b89e30d72d9b6eae874f4e5af7bd3fb27" ||
-      digest ==
-      "ae7dc0d7ba94651af0ccd729122f623d3dbdf0b85c6c787838c04bbc721135d6";
-  if (digest == "503266c4f4c2350b357c8c15021d8bde28973254745d9302b8e3cfde66489a27" || digest ==
-      "63712922499b2155a3d2c6f54abbdfc1eaf95d08712b937c6276d6a8ae0d774d")
-    layout = {286039420, 291467216, 285330768, 291471160,
-              291471288, 286043596, 286058864, 285330980};
-  else if (version117)
-    layout = {286154492, 291584816, 285445496, 291588760,
-              291588888, 286158668, 286173944, 285445708};
-  else {
-    Log("kit_disabled unknown_holster_layout=1");
+  const HostLayout *build = identifyHost(digest);
+  if (!build) {
+    Log("kit_disabled unknown_holster_layout=1 sha256=%s", digest.c_str());
     return false;
   }
-  InstallHostInput(uintptr_t(m), version117);
-  InstallHostXrSubmission(uintptr_t(m), version117);
-  host = uintptr_t(m) - 0x10000000;
-  InstallForceOdds(host, version117);
+  host = uintptr_t(m);
+  layout = build->holsters;
+  Log("host_layout version=%s anchor_stride=%u", build->version, layout.anchorStride);
+  InstallHostInput(host, *build);
+  InstallHostXrSubmission(host, build->endFrame);
+  InstallForceOdds(host, build->hover);
   slotQuery = api->compile("begin Function {}\nSetFunctionValue (Call "
                            "(CompileScript \"TTWVRLockKit/Slot.txt\"))\nend");
   stockQuery = api->compile("begin Function {}\nSetFunctionValue "
@@ -214,32 +201,26 @@ bool init() {
                    "(CompileScript \"TTWVRLockKit/AssignPin.txt\") slot)\nend");
   if (!slotQuery || !stockQuery || !playQuery || !drop || !assignPin || !closeLockMenu)
     return false;
-  const uintptr_t site = host + (version117 ? 0x102288c3 : 0x10221573);
-  const uintptr_t target = host + (version117 ? 0x10226840 : 0x1021f4f0);
-  resolveCenter = reinterpret_cast<ResolveCenter>(target);
-  const NativeCall centerHook{site, target, reinterpret_cast<void *>(observeCenter)};
-  const bool poseInstalled = InstallWorldPinPose(host + (version117 ? 0x10218c85 : 0x10211945),
-                                               host + (version117 ? 0x101f5820 : 0x101ee4e0),
-                                               host + (version117 ? 0x10205405 : 0x101fe0c5),
-                                               host + (version117 ? 0x10215fe0 : 0x1020eca0));
+  resolveCenter = reinterpret_cast<ResolveCenter>(host + build->center.target);
+  const NativeCall centerHook{host + build->center.site, uintptr_t(resolveCenter), reinterpret_cast<void *>(observeCenter)};
+  const bool poseInstalled = InstallWorldPinPose(host + build->restoreHand.site, host + build->restoreHand.target,
+                                                host + build->sleeve.site, host + build->sleeve.target);
   Log("world_pin_post_animation installed=%d",poseInstalled);
   if (!poseInstalled) return false;
-  gamePreference = reinterpret_cast<ReadPreference>(host + (version117 ? 0x1000b235 : 0x1000b172));
-  const unsigned lootSites117[]{0x1012713b, 0x10127300, 0x1013b32a};
-  const unsigned lootSites116[]{0x101262db, 0x101264a0, 0x1013a4aa};
+  gamePreference = reinterpret_cast<ReadPreference>(host + build->lootPreference);
   NativeCall lootHooks[3];
   for (unsigned i = 0; i < 3; ++i)
-    lootHooks[i] = {host + (version117 ? lootSites117[i] : lootSites116[i]),
+    lootHooks[i] = {host + build->lootSites[i],
                     uintptr_t(gamePreference), reinterpret_cast<void *>(kitLootPreference)};
   Log("kit_hand_loot_filter installed=%d", InstallVerifiedCalls(lootHooks, 3));
-  gameCanShowWrist = reinterpret_cast<CanShowWrist>(host + (version117 ? 0x1000255e : 0x10002545));
-  const NativeCall wristHook{host + (version117 ? 0x10101aa6 : 0x10100fa6),
+  gameCanShowWrist = reinterpret_cast<CanShowWrist>(host + build->autoWrist.target);
+  const NativeCall wristHook{host + build->autoWrist.site,
                              uintptr_t(gameCanShowWrist), reinterpret_cast<void *>(kitCanShowWrist)};
   Log("kit_auto_wrist_filter installed=%d", InstallVerifiedCalls(&wristHook, 1));
   Log("kit_native_centers installed=%d", InstallVerifiedCalls(&centerHook, 1));
   Log("bobby_pin_inventory_favourite installed=%d",
       InstallPinFavourite(uintptr_t(GetModuleHandleW(nullptr))));
-  Log("bobby_pin_wrist_favourite installed=%d", InstallWristPinFavourite(uintptr_t(m), version117));
+  Log("bobby_pin_wrist_favourite installed=%d", InstallWristPinFavourite(host, build->inventory));
   return true;
 }
 int run(void *script) {
@@ -299,7 +280,7 @@ void locateHolsters(GameState &g) {
   for (int s = 0; s < 8; s++) {
     if (!read<unsigned char>(host + layout.enabled + s))
       continue;
-    auto bind = host + layout.bindings + s * 20;
+    auto bind = host + layout.bindings + s * layout.anchorStride;
     if (read<unsigned char>(bind + 16))
       continue;
     float radius = read<float>(host + layout.positions + 16 * s + 12) * unit;

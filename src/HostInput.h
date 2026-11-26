@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include "HostLayout.h"
 #include "Math.h"
 #include <cstddef>
 #include <cstdint>
 
 namespace locks {
-// Tracking sample produced by both TTWVR 1.1.6/1.1.7 backends, in metres.
+// Tracking sample produced by both supported TTWVR backends, in metres.
 struct HostPose {
   Vec position;
   Quat orientation;
@@ -34,8 +35,8 @@ static_assert(sizeof(HostFrame) == 0x130 && offsetof(HostFrame, hands) == 0x20 &
               offsetof(HostFrame, valid) == 0x12c);
 using HostPulse = void (__thiscall *)(void *, bool, float, float);
 // Returns whether TTWVR can supply OpenXR input.
-bool InstallHostInput(uintptr_t image, bool version117);
-void InstallHostXrSubmission(uintptr_t image, bool version117);
+bool InstallHostInput(uintptr_t image, const HostLayout &build);
+void InstallHostXrSubmission(uintptr_t image, HostLayout::Call endFrame);
 void ProcessHostInput(void *backend, HostPulse pulse, HostFrame &frame, bool valid, bool openVR);
 bool HostMenuPresented(uintptr_t menu);
 }
