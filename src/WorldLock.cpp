@@ -541,6 +541,7 @@ struct KeySession {
   Ptr mesh = 0, form = 0;
   PhysicalKey gesture;
   Vec gripOffsets[2]{};
+  Mat keyInController[2];
   Transform closePlacement;
   GameState backdrop;
   bool closeup = false, switchRequested = false;
@@ -740,11 +741,14 @@ void TickPhysicalKey(GameState &g) {
     // offset in the controller frame throughout the carry and turn.
     if (key.gesture.owner != h) {
       Vec fingers;
-      key.gripOffsets[h] = KeyFingerContact(h,fingers)
+      Mat orientation=world.rotation;
+      key.gripOffsets[h] = KeyFingerContact(h,fingers,&orientation)
           ? bounded(world.rotation.transpose().apply(fingers-world.position) *
                     (1 / g.worldUnitsPerMeter), .095f) : Vec{};
+      key.keyInController[h]=mul(world.rotation.transpose(),orientation);
     }
     world.position = world.position + world.rotation.apply(key.gripOffsets[h])*g.worldUnitsPerMeter;
+    world.rotation=mul(world.rotation,key.keyInController[h]);
     if (held && !key.gesture.seated) LimitKeyReach(h,world);
     hands[h]=relativeTransform(world,placement);
   }
@@ -782,6 +786,12 @@ void TickPhysicalKey(GameState &g) {
   static ULONGLONG traceAt = 0;
   if (keyTrace && now>=traceAt) {
     traceAt=now+350;
+    if (key.gesture.owner>=0) {
+      const int h=key.gesture.owner;
+      const auto &m=key.keyInController[h].v;
+      Log("physical_key_basis hand=%d controller_to_key=%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
+          h,m[0],m[1],m[2],m[3],m[4],m[5],m[6],m[7],m[8]);
+    }
     Vec bow, axis, palm[2]{};
     const auto toTracking=[&](Vec p,Vec &out) {
       return WorldToTracking(placement.position+placement.rotation.apply(p)*placement.scale,out);

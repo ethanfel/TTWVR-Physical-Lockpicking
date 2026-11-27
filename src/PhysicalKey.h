@@ -3,6 +3,15 @@
 #include "GameTransform.h"
 
 namespace locks {
+// Mesh -Z points from the bow to the teeth. Mesh X spans the two flat
+// faces. Build both axes from the fitted hand so the shaft continues the
+// wrist-to-pinch line and the teeth have the same handedness on either side.
+inline Mat keyGripFrame(Vec pinch, Vec padNormal, int hand) {
+  const Vec back=normal(pinch)*-1.f;
+  const Vec side=normal(padNormal-back*dot(padNormal,back))*(hand ? -1.f : 1.f);
+  const Vec up=cross(back,side);
+  return {{side.x,up.x,back.x,side.y,up.y,back.y,side.z,up.z,back.z}};
+}
 // The stock key mesh is 60 mm long with its origin at the nose.
 struct PhysicalKey {
   static constexpr float restZ = .055f, seatZ = .007f, bowZ = .049f;

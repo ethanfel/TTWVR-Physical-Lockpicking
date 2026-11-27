@@ -10,7 +10,7 @@ import sys
 from prepare import SUPPORTED
 
 HERE = Path(__file__).resolve().parent
-MOD = "TTWVR Physical Lockpicking - 1.1.8-r5"
+MOD = "TTWVR Physical Lockpicking - 1.1.8-r6"
 
 
 def ask(label, default=None):
@@ -29,8 +29,8 @@ def main():
     if sys.version_info[:2] not in ((3, 11), (3, 12)):
         raise ValueError("Run the installer with Python 3.11 or 3.12.")
     if not (HERE / "bin/TTWVRPhysicalLockpicking.dll").is_file():
-        raise ValueError("Extract the complete 1.1.8-r5 release ZIP and run install.py there.")
-    print("TTWVR Physical Lockpicking · 1.1.8-r5\nClose Fallout and the mod manager before continuing.")
+        raise ValueError("Extract the complete 1.1.8-r6 release ZIP and run install.py there.")
+    print("TTWVR Physical Lockpicking · 1.1.8-r6\nClose Fallout and the mod manager before continuing.")
     game = local(ask("Managed game folder containing FalloutNV.exe"))
     if not (game / "FalloutNV.exe").is_file():
         raise ValueError(f"FalloutNV.exe is missing from {game}")

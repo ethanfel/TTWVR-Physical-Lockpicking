@@ -83,10 +83,14 @@ def key_grip(bind, prefix, hand):
     # 5.74 mm thick head of Key01Dirty. Mirror spread and roll at the wrist.
     sign = 1 if hand else -1
     finger = finger_solver(bind, prefix)
-    pose = finger("Finger1", [44.1, 55.8, 52.9], sign * 8.2, sign * -15.9)
-    pose.update(finger("Thumb1", [18.5, 38.6, 7.3], sign * -31.8, sign * -65))
-    for digit in ("Finger2", "Finger3", "Finger4"):
-        pose.update(finger(digit, [35, 50, 35]))
+    # The thumb runs along the blade. The bent index opposes its pad at
+    # the bow, while the unused fingers hang below in a relaxed cascade.
+    pose = finger("Finger1", [.43, 65.87, 75], sign * -10.8, sign * -1.42)
+    pose.update(finger("Thumb1", [11.82, 3.52, -15], sign * .84, sign * -72.05))
+    for digit, bend in (("Finger2", [28, 21, 9]),
+                        ("Finger3", [32, 26, 13]),
+                        ("Finger4", [38, 30, 16])):
+        pose.update(finger(digit, bend))
     return pose
 
 

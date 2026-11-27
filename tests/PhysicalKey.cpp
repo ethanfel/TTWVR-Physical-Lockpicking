@@ -7,6 +7,14 @@ static Mat roll(float degrees) {
   return matrix({0,0,std::sin(a),std::cos(a)});
 }
 int main() {
+  for (int hand : {0,1}) {
+    const float side=hand ? 1.f : -1.f;
+    const Vec pinch{9.92f,3.04f,side*3.43f}, pads{-.16f,.375f,side*.16f};
+    const Mat fit=keyGripFrame(pinch,normal(pads),hand);
+    assert(dot(fit.apply({0,0,-1}),normal(pinch))>.99999f);
+    const Vec x=fit.apply({1,0,0}), y=fit.apply({0,1,0}), z=fit.apply({0,0,1});
+    assert(dot(cross(x,y),z)>.99999f && std::abs(dot(x,normal(pads)))>.99f);
+  }
   const Transform rest{{},{0,0,PhysicalKey::restZ},1};
   for (int h : {0,1}) for (int sign : {-1,1}) {
     PhysicalKey key;

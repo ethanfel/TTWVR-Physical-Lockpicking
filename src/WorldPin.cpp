@@ -22,6 +22,7 @@ struct HandRig {
   Grip pose = Grip::None;
   uintptr_t upper=0, fore=0, sleeve=0, tool=0;
   Vec contactOffset{}, keyPinch{}, keyAxis{};
+  Mat keyFrame;
   bool shifted=false, keyReach=false;
   Vec shoulderRaw{}, shoulderShown{};
   Transform goal, toolFit, presentedFore;
@@ -264,6 +265,9 @@ void bindRig(int h, uintptr_t hand) {
   }
   r.keyPinch=(contact[0]+contact[1])*.5f;
   r.keyAxis=normal(contact[0]-contact[1]);
+  if (length(cross(normal(r.keyPinch),r.keyAxis))>.5f)
+    r.keyFrame=keyGripFrame(r.keyPinch,r.keyAxis,h);
+  else r.keyAxis={};
 }
 void poseRig(int h, Grip wanted) {
   auto &r = rigs[h];
@@ -419,16 +423,18 @@ void ResetWorldPin() {
 }
 // The fitted contact is wrist-local. Read the animated arm before posing it,
 // so the rendered correction can never feed back into controller tracking.
-static Mat alignKeyFaces(const HandRig &r,const Transform &wrist,const Mat &key) {
-  const Vec axis=wrist.rotation.apply(r.keyAxis);
-  Vec face=key.apply({1,0,0});
-  if (dot(axis,face)<0) face=face*-1.f;
-  return matrix(shortestArc(axis,face));
+static Mat alignKeyGrip(const HandRig &r,const Transform &wrist,Mat key) {
+  const Mat animated=mul(wrist.rotation,r.keyFrame);
+  // A seated key can be regripped from either flat face.
+  if (dot(animated.apply({1,0,0}),key.apply({1,0,0}))<0)
+    key=mul(key,Mat{{-1,0,0,0,-1,0,0,0,1}});
+  return mul(key,animated.transpose());
 }
-bool KeyFingerContact(int h, Vec &world) {
+bool KeyFingerContact(int h, Vec &world, Mat *orientation) {
   const auto &r=rigs[h];
   const auto *w=field<Transform>(r.hand,0x68);
   if (!w || length(r.keyAxis)<.5f) return pads(h,world);
+  if (orientation) *orientation=mul(w->rotation,r.keyFrame);
   world=w->position+w->rotation.apply(r.keyPinch)*w->scale;
   return finite(world);
 }
@@ -457,7 +463,7 @@ void PresentKeyGrip(int h, const Transform &keyWorld) {
   const auto *w=field<Transform>(r.hand,0x68);
   if (!w || !(keyWorld.scale>0)) return;
   const Vec bow=keyWorld.position+keyWorld.rotation.apply({0,0,PhysicalKey::bowZ})*keyWorld.scale;
-  Mat turn=alignKeyFaces(r,*w,keyWorld.rotation);
+  Mat turn=alignKeyGrip(r,*w,keyWorld.rotation);
   Vec wristToBow=turn.apply(w->rotation.apply(r.keyPinch)*w->scale);
   Vec origin; float reach;
   if (keyArmReach(r,origin,reach) && length(bow-origin-wristToBow)>reach) {
@@ -473,8 +479,9 @@ void PresentKeyGrip(int h, const Transform &keyWorld) {
   if (trace && GetTickCount64()>=report) {
     Vec actual;
     if (KeyFingerContact(h,actual))
-      Log("key_grip hand=%d center_error_mm=%.1f face_dot=%.3f",h,
+      Log("key_grip hand=%d center_error_mm=%.1f shaft_dot=%.4f face_dot=%.3f",h,
           length(actual-bow)*1000.f/keyWorld.scale,
+          dot(normal(actual-w->position),keyWorld.rotation.apply({0,0,-1})),
           std::abs(dot(w->rotation.apply(r.keyAxis),keyWorld.rotation.apply({1,0,0}))));
     report=GetTickCount64()+350;
   }
