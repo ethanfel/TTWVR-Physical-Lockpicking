@@ -22,7 +22,7 @@ struct GameState {
   Vec kitCenters[8]{};
   float kitRadii[8]{};
   bool keyAvailable = false;
-  unsigned keyGripMask = 0;
+  unsigned keyGripMask = 0, keyTriggerMask = 0;
   bool kitGameplay = false, holsterEditing = false, drawToolsByButton = false;
   Vec kitPalms[2]{}, kitFingerPads[2]{};
   unsigned kitFingerPadsValid = 0;

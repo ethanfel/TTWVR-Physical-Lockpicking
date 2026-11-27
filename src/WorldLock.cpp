@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "WorldLock.h"
 #include "PhysicalKey.h"
+#include "WorldPin.h"
 #include "NativeScene.h"
 #include "MountedInteraction.h"
 #include "LockRules.h"
@@ -539,12 +540,13 @@ struct KeySession {
   Selection target;
   Ptr mesh = 0, form = 0;
   PhysicalKey gesture;
+  Vec gripOffsets[2]{};
   Transform closePlacement;
   GameState backdrop;
   bool closeup = false, switchRequested = false;
   unsigned triggerArmed = 0;
   float drawnAngle = 0;
-  int direction = 1;
+  int direction = 1, pullHand = -1;
   ULONGLONG lastTracked = 0;
 };
 KeySession key;
@@ -630,6 +632,7 @@ bool offerPhysicalKey(KeyOffer offer, ULONGLONG now) {
   RetainSceneNode(mesh);
   key.target = t;
   key.mesh = mesh;
+  *reinterpret_cast<uint32_t *>(mesh+0x30) |= 1u; // Keep the parked live key inside the kit.
   key.form = offer.form;
   key.direction = read<uint8_t>(read<Ptr>(t.ref+0x20)+4)==0x1c ? twistDirection(t.kind,t.side) : 1;
   key.lastTracked = now;
@@ -657,6 +660,15 @@ int HoverLockLevel(unsigned id) {
   if (!base || (type != 0x1b && type != 0x1c)) return -1;
   ensureWorldAction();
   return call(action,ref,3) - 1;
+}
+bool HasPhysicalKeyTarget() { return key.mesh != 0; }
+int PhysicalKeyHand() { return key.gesture.owner; }
+bool PullPhysicalKey(int hand, bool grip) {
+  if (!key.mesh || !current(key.target) || !locked(key.target.ref) ||
+      ownedKey(key.target.ref) != key.form) return false;
+  if (grip && key.gesture.owner < 0 && !key.gesture.seated && key.pullHand < 0)
+    key.pullHand = hand;
+  return true;
 }
 void TickPhysicalKey(GameState &g) {
   if (!ready || !NativeReady() || !g.kitGameplay || g.menu || g.kitDrawn || g.holsterEditing || finishing || HasParkedPin()) {
@@ -712,6 +724,7 @@ void TickPhysicalKey(GameState &g) {
     if (key.drawnAngle!=0) keyPlug(key.target,0);
     key.closeup = true;
     key.gesture = {};
+    key.pullHand = -1;
     key.drawnAngle = 0;
     Log("physical_key_closeup ref=%08x",key.target.id);
   }
@@ -723,6 +736,15 @@ void TickPhysicalKey(GameState &g) {
     if (trigger) triggers |= 1u<<h;
     tracked |= 1u<<h;
     if (held) grips |= 1u<<h;
+    // Fit the bow to the fingertips at pickup. Once held, keep this rigid
+    // offset in the controller frame even when the avatar arm reaches its limit.
+    if (key.gesture.owner != h) {
+      Vec fingers;
+      key.gripOffsets[h] = KeyFingerContact(h,fingers)
+          ? bounded(world.rotation.transpose().apply(fingers-world.position) *
+                    (1 / g.worldUnitsPerMeter), .095f) : Vec{};
+    }
+    world.position = world.position + world.rotation.apply(key.gripOffsets[h])*g.worldUnitsPerMeter;
     hands[h]=relativeTransform(world,placement);
   }
   if (tracked) key.lastTracked=now;
@@ -732,11 +754,27 @@ void TickPhysicalKey(GameState &g) {
     return;
   }
   const bool wasSeated=key.gesture.seated;
-  key.gesture.step(hands,tracked,grips,key.direction,settings.fullTurnWrist);
+  const int pull = key.pullHand;
+  key.pullHand = -1;
+  if (pull >= 0 && (tracked & grips & (1u<<pull))) {
+    key.gesture.draw(pull,hands[pull]);
+    Log("physical_key_draw source=holster hand=%d ref=%08x",pull,key.target.id);
+  }
+  Transform rest;
+  if (key.closeup) {
+    // Present the bow at the player's configured pin-box position.
+    rest.rotation = matrix(axisAngle({0,1,0},-pi/3));
+    rest.position = holderPoint(settings,0) - rest.rotation.apply({0,0,PhysicalKey::bowZ});
+  }
+  key.gesture.step(hands,tracked,grips,key.direction,settings.fullTurnWrist,rest,key.closeup);
   g.keyGripMask=key.gesture.inReach | (key.gesture.owner>=0 ? 1u<<key.gesture.owner : 0u);
-  // A deliberate trigger press on the bow also offers the close-up for
-  // hosts whose custom activation bypasses the normal player activation event.
-  if (key.gesture.owner < 0 && (triggers & key.triggerArmed & key.gesture.inReach & ~grips))
+  // Open or leave the close-up at the lock even when the live key is stowed.
+  // Reserve only trigger near the keyway; grip still belongs to the kit.
+  for (int h=0;h<2;++h)
+    if ((tracked & (1u<<h)) && length(hands[h].position-Vec{0,0,.065f}) < .105f)
+      g.keyTriggerMask |= 1u<<h;
+  g.keyTriggerMask |= g.keyGripMask;
+  if (key.gesture.owner < 0 && (triggers & key.triggerArmed & g.keyTriggerMask & ~grips))
     key.switchRequested = true;
   key.triggerArmed = tracked & ~triggers;
   static const bool keyTrace = GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE",nullptr,0)>0;
@@ -747,7 +785,7 @@ void TickPhysicalKey(GameState &g) {
     const auto toTracking=[&](Vec p,Vec &out) {
       return WorldToTracking(placement.position+placement.rotation.apply(p)*placement.scale,out);
     };
-    Vec resting{0,0,PhysicalKey::restZ+PhysicalKey::bowZ};
+    Vec resting = key.closeup ? holderPoint(settings,0) : Vec{0,0,.065f};
     if (toTracking(resting,bow) && toTracking(resting+Vec{0,0,.05f},axis)) {
       for (int h=0;h<2;++h) if (tracked&(1u<<h)) toTracking(hands[h].position,palm[h]);
       axis=axis-bow;
@@ -763,6 +801,9 @@ void TickPhysicalKey(GameState &g) {
   }
   const Transform parent=read<Transform>(key.target.root+0x68);
   if (!(parent.scale>.0001f)) { resetPhysicalKey(); return; }
+  auto &flags=*reinterpret_cast<uint32_t *>(key.mesh+0x30);
+  const bool visibleKey=key.closeup || key.gesture.owner>=0 || key.gesture.seated;
+  if (visibleKey) flags &= ~1u; else flags |= 1u;
   auto local=relativeTransform(childWorld(placement,key.gesture.pose),parent);
   auto &previous=*reinterpret_cast<Transform*>(key.mesh+0x34);
   if (memcmp(&previous,&local,sizeof(local))) {

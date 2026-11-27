@@ -2,7 +2,7 @@
 
 Pick a door, safe or ammo box with both hands in VR. Draw the bobby pin and screwdriver from one holster, bend the pin, then feel the lock resist as you twist the screwdriver.
 
-**[Download the ready-to-play 1.1.8-r3 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/1.1.8-r3/TTWVR-Physical-Lockpicking-1.1.8-r3-Ready-to-Play.zip)**
+**[Download the ready-to-play 1.1.8-r4 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/1.1.8-r4/TTWVR-Physical-Lockpicking-1.1.8-r4-Ready-to-Play.zip)**
 
 ## Install
 
@@ -20,9 +20,12 @@ The addon takes controller input and haptics from the backend TTWVR selects, inc
 
 ## When you have the key
 
-Approach a supported locked door or container with your tools stowed. If you own its matching key, a worn metal key appears at the keyhole. Grip its head with either hand, push it into the slot, then turn your wrist. Left-mounted door locks turn clockwise and right-mounted ones turn counterclockwise. Containers turn clockwise.
+If you own the matching key, approach the locked door or container with your tools stowed.
 
-For the close-up, tap **trigger** beside the key, then use the same grip, push and turn. To leave early, release the grip and tap trigger beside the key again. Regular player activation also opens this view while the key is showing. Fallout handles the actual keyed activation, including any scripts on the door or container. This works with zero bobby pins and at any Lockpick skill.
+- **Live:** Grip your assigned lockpicking holster with either hand and pull your hand out to draw the key. Bring it to the keyhole, insert it and turn.
+- **Close-up:** Activate the lock or tap trigger beside its keyhole. The key takes the place of the pin box and screwdriver. Grip the key with either hand, insert it and turn. You can also draw it from your assigned holster here. To leave early, release grip and tap trigger beside the keyhole.
+
+Left-mounted door locks turn clockwise, right-mounted ones counterclockwise. Containers turn clockwise. The key stays in your inventory. The close-up works without a bound holster, including at zero Lockpick skill with no bobby pins.
 
 ## Your first lock
 

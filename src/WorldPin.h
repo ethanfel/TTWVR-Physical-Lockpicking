@@ -3,6 +3,7 @@
 #include "Shared.h"
 namespace locks {
 bool InstallWorldPinPose(uintptr_t site, uintptr_t target, uintptr_t sleeveSite, uintptr_t sleeveTarget);
+bool KeyFingerContact(int hand, Vec &world);
 bool ParkWorldPin(int hand);
 bool NearParkedPin(int hand, float unitsPerMeter);
 bool RegrabWorldPin(int hand);

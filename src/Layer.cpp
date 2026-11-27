@@ -796,7 +796,7 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
   // A trigger press on the wire keeps its existing bend/regrab action. For a
   // holster pull, reserve the trigger immediately so it cannot fire a weapon.
   const unsigned pinch = (g.kitBendNear | g.kitRegrabNear) & ~holster.reserved;
-  pinPull.update(g.drawToolsByButton ? slot : 0,triggers & ~g.keyGripMask,triggerActive,valid,inRange,
+  pinPull.update(g.drawToolsByButton ? slot : 0,triggers & ~g.keyTriggerMask,triggerActive,valid,inRange,
                  busy | grips | holster.reserved | pinch,g.holsterEditing,palms,now,false);
   const unsigned drawn = holster.drawn | pinPull.drawn;
   const unsigned allowed = pinch | drawn;
@@ -844,7 +844,7 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
   // preserve that grip until its release.
   s.kitCapture = gameplayKit ? controls.capture(s.kitCapture, s.kitArmed, allowed, g.kitHands) : 0;
   const unsigned consumed = s.kitWeapons.update(gameplayKit && g.kitHands, grips, triggers,
-                                                gripActive, triggerActive, s.kitCapture | (grips & g.keyGripMask), holster.reserved & ~g.keyGripMask, pinPull.pending | g.keyGripMask);
+                                                gripActive, triggerActive, s.kitCapture | (grips & g.keyGripMask), holster.reserved & ~g.keyGripMask, pinPull.pending | g.keyTriggerMask);
   s.kitArmed=valid & ~down;
   if(kitTrace) {
     static unsigned lastRoute=~0u;

@@ -373,10 +373,12 @@ void ResetWorldPin() {
   opening = twist = 0;
   meshOpening = -1;
 }
+bool KeyFingerContact(int hand, Vec &world) { return pads(hand,world); }
 void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
                    unsigned down, unsigned pressed, unsigned valid,
                    unsigned nearKit, int driverHand, float &pinHealth) {
-  if (!g.kitSlot && owner < 0 && helper < 0 && driverOwner < 0)
+  if (!g.kitSlot && !HasPhysicalKeyTarget() && owner < 0 && helper < 0 && driverOwner < 0 &&
+      rigs[0].pose == Grip::None && rigs[1].pose == Grip::None)
     return;
   if (pinHand < 0 && driverHand < 0)
     ResetWorldLock(false);
@@ -409,7 +411,7 @@ void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
       removeContact(rigs[h]);
       UpdateSceneNode(rigs[h].upper);
     }
-    poseRig(h, (!parked && h == owner) || h == helper ? Grip::Pin
+    poseRig(h, (!parked && h == owner) || h == helper || h == PhysicalKeyHand() ? Grip::Pin
                : h == driverHand         ? Grip::Driver
                                          : Grip::None);
     if (parked && h != driverHand && NearParkedPin(h, g.worldUnitsPerMeter))

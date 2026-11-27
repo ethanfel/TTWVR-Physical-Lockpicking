@@ -33,7 +33,7 @@ void *slotQuery = nullptr, *playQuery = nullptr, *stockQuery = nullptr,
 void *assignPin = nullptr, *holsterWeapon = nullptr;
 std::atomic<void *> closeLockMenu{nullptr};
 std::atomic<uintptr_t> closeupExitRequest{0};
-std::atomic<unsigned> occupiedHands{0};
+std::atomic<unsigned> occupiedHands{0}, keyHandMask{0};
 // These three TTWVR callers read only the per-hand loot preference from the
 // config pointer. The VR settings screen continues to use the real config.
 struct LootPreference {
@@ -48,7 +48,7 @@ CanShowWrist gameCanShowWrist = nullptr;
 bool __cdecl kitCanShowWrist() {
   // Only TTWVR's automatic wrist-panel update asks through this call site.
   bool allowed = gameCanShowWrist();
-  unsigned held = occupiedHands.load(std::memory_order_relaxed);
+  unsigned held = occupiedHands.load(std::memory_order_relaxed) | keyHandMask.load(std::memory_order_relaxed);
   static const bool trace = GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE", nullptr, 0) > 0;
   if (trace && allowed) {
     static thread_local unsigned previous = ~0u;
@@ -61,7 +61,7 @@ bool __cdecl kitCanShowWrist() {
 }
 const LootPreference *__cdecl kitLootPreference() {
   auto config = gamePreference();
-  unsigned occupied = occupiedHands.load(std::memory_order_relaxed);
+  unsigned occupied = occupiedHands.load(std::memory_order_relaxed) | keyHandMask.load(std::memory_order_relaxed);
   if (!occupied || !config) return config;
   unsigned value = lootHandsWithKit(config->hands, occupied);
   static constexpr LootPreference choices[]{{{},0}, {{},1}, {{},2}, {{},3}};
@@ -364,6 +364,7 @@ void InitKit(void *scripts, bool byButton) {
 }
 void ResetKit() {
   occupiedHands = 0;
+  keyHandMask = 0;
   nextHolster = 0;
   pinHealth = 1;
   ResetWorldPin();
@@ -456,6 +457,10 @@ bool DismissLockMenu(const GameState &g) {
   return true;
 }
 void TickKit(GameState &g) {
+  const int keyHand=PhysicalKeyHand();
+  const unsigned heldKey=keyHand>=0 ? 1u<<keyHand : 0u;
+  keyHandMask.store(heldKey,std::memory_order_relaxed);
+  g.kitHands |= heldKey;
   g.drawToolsByButton = drawByButton;
   if (!initialized) {
     initialized = true;
@@ -596,6 +601,8 @@ void TickKit(GameState &g) {
           else show(h, 0, false);
         }
       } else if ((latest.holsterDraw() & bit) && shown[h] < 0) {
+        const bool gripPull = !(latest.pinDraw() & bit);
+        if (!roles.drawn && PullPhysicalKey(h, gripPull)) continue;
         auto next = roles;
         int requested = drawByButton ? int(!(latest.pinDraw() & bit)) : -1;
         int t = next.draw(h, requested == 1 || run(stockQuery) > 0, requested, requested == 1 && HasParkedPin());
