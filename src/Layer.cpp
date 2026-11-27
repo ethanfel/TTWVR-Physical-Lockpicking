@@ -761,7 +761,7 @@ struct KitSample {
 };
 void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit, bool sampleKit, bool succeeded) {
   auto &[valid,triggers,grips,gripActive,triggerActive,palms,kitController,trackedGrips,gripTime,triggerTime] = sample;
-  if (sampleKit) SampleKitControllers(kitController, trackedGrips, gripActive & triggerActive & ~(grips | triggers));
+  if (sampleKit) SampleKitControllers(kitController, trackedGrips, gripActive & triggerActive & ~(grips | triggers), gripActive, grips, triggerActive, triggers);
   static bool kitTrace=GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE",nullptr,0)>0;
   static ULONGLONG kitTraceTime=0;
   if(kitTrace && valid==3 && GetTickCount64()>=kitTraceTime) {
@@ -770,7 +770,7 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
   }
   unsigned inRange=g.kitGameplay ? KitReach(g,palms,valid) : 0;
   const unsigned physical=grips | triggers;
-  if(observeKit && g.kitGameplay && g.kitSlot<=8) {
+  if(observeKit && g.kitGameplay && g.kitSlot && g.kitSlot<=8) {
     for (int hand=0; hand<2; ++hand) {
       unsigned bit=1u<<hand;
       if (!(physical & ~s.kitPhysicalDown & bit)) continue;
@@ -791,18 +791,18 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
   const auto now = GetTickCount64();
   const unsigned busy = g.kitHands | s.kitCapture;
   auto &pinPull = s.pinHolster;
-  holster.update(slot,grips,gripActive,valid,inRange,busy | pinPull.pending | pinPull.drawn,
+  holster.update(slot,grips & ~g.keyGripMask,gripActive,valid,inRange,busy | pinPull.pending | pinPull.drawn,
                  g.holsterEditing,palms,now);
   // A trigger press on the wire keeps its existing bend/regrab action. For a
   // holster pull, reserve the trigger immediately so it cannot fire a weapon.
   const unsigned pinch = (g.kitBendNear | g.kitRegrabNear) & ~holster.reserved;
-  pinPull.update(g.drawToolsByButton ? slot : 0,triggers,triggerActive,valid,inRange,
+  pinPull.update(g.drawToolsByButton ? slot : 0,triggers & ~g.keyGripMask,triggerActive,valid,inRange,
                  busy | grips | holster.reserved | pinch,g.holsterEditing,palms,now,false);
   const unsigned drawn = holster.drawn | pinPull.drawn;
   const unsigned allowed = pinch | drawn;
   auto &controls = s.kitControls;
   if (g.menu || !g.kitSlot) controls = {};
-  controls.update(grips & ~(holster.reserved | pinPull.pending),triggers,gripActive,triggerActive,valid,pinch,pinPull.drawn);
+  controls.update(grips & ~(holster.reserved | pinPull.pending | g.keyGripMask),triggers,gripActive,triggerActive,valid,pinch,pinPull.drawn);
   valid = controls.valid;
   unsigned down = controls.down;
   for (int n = 0; n < 2; ++n)
@@ -844,7 +844,7 @@ void RouteKit(Session &s, const GameState &g, KitSample &sample, bool observeKit
   // preserve that grip until its release.
   s.kitCapture = gameplayKit ? controls.capture(s.kitCapture, s.kitArmed, allowed, g.kitHands) : 0;
   const unsigned consumed = s.kitWeapons.update(gameplayKit && g.kitHands, grips, triggers,
-                                                gripActive, triggerActive, s.kitCapture, holster.reserved, pinPull.pending);
+                                                gripActive, triggerActive, s.kitCapture | (grips & g.keyGripMask), holster.reserved & ~g.keyGripMask, pinPull.pending | g.keyGripMask);
   s.kitArmed=valid & ~down;
   if(kitTrace) {
     static unsigned lastRoute=~0u;
@@ -868,7 +868,7 @@ XrResult XRAPI_CALL Sync(XrSession h, const XrActionsSyncInfo *c) {
   if (capture != s.captureInputs)
     Log("input_capture active=%d original_back_preserved=1", capture);
   s.captureInputs = capture; // Stable for every read until the next sync.
-  bool observeKit=!g.menu && g.kitSlot && i.kitSet && s.attached && s.focused;
+  bool observeKit=!g.menu && (g.kitSlot || g.keyAvailable) && i.kitSet && s.attached && s.focused;
   auto copy = *c;
   // A menu, unbinding the kit, or a focus change can stow both tools while
   // their buttons are still down. Continue sampling until each button is up.
@@ -2238,7 +2238,7 @@ void ProcessHostInput(void *backend, HostPulse pulse, HostFrame &frame, bool val
       std::chrono::steady_clock::now().time_since_epoch()).count();
   if (s.focused && frame.eyes[1].pose.usable())
     NativeSceneCalibration(frame.eyes[1].pose.pose());
-  const bool observe = s.focused && !g.menu && g.kitSlot;
+  const bool observe = s.focused && !g.menu && (g.kitSlot || g.keyAvailable);
   const bool sampling = observe || (s.focused && s.kitWeapons.awaitingRelease());
   KitSample kit{};
   if (sampling) for (int h=0; h<2; ++h) {

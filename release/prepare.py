@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Build a mod-manager-ready TTWVR Physical Lockpicking 1.1.8-r2 mod from local assets."""
+"""Build a mod-manager-ready TTWVR Physical Lockpicking 1.1.8-r3 mod from local assets."""
 import argparse
 import hashlib
 import json
@@ -66,7 +66,7 @@ def main():
         parser.error("TTWVR.dll is missing from the supplied TTWVR mod")
     version = SUPPORTED.get(hashlib.sha256(dll.read_bytes()).hexdigest())
     if not version:
-        parser.error("Unsupported TTWVR.dll. 1.1.8-r2 supports TTWVR 1.1.6, 1.1.7 and 1.1.8.")
+        parser.error("Unsupported TTWVR.dll. 1.1.8-r3 supports TTWVR 1.1.6, 1.1.7 and 1.1.8.")
     roots = []
     if args.mods:
         roots = [args.mods / row[1:] for row in args.modlist.read_text(encoding="utf-8-sig").splitlines()
@@ -126,17 +126,18 @@ def main():
         shutil.copy2(helper, local_helper)
         local_helper.chmod(0o755)
         subprocess.run([str(local_helper), str(assets / "props.bin"), str(temp / "hardware-")], check=True)
+        run("key", "--data", args.data, "--output", mod)
         run("world_locks", "--data", args.data, "--hardware", temp, "--output", mod)
         run("kit", "--data", args.data, "--assets", assets, "--hand-mod", args.ttwvr, "--output", mod)
         shutil.copyfile(ROOT / "bin/TTWVRPhysicalLockpicking.dll", plugins / "TTWVRPhysicalLockpicking.dll")
         shutil.copyfile(SOURCE / "TTWVRPhysicalLockpicking.ini", plugins / "TTWVRPhysicalLockpicking.ini")
         for manifest in (SOURCE / "manifest").glob("*.json"):
             shutil.copyfile(manifest, assets / manifest.name)
-        (mod / "meta.ini").write_text("[General]\nversion=1.1.8-r2\ncomments=TTWVR Physical Lockpicking 1.1.8-r2\n", encoding="utf-8")
+        (mod / "meta.ini").write_text("[General]\nversion=1.1.8-r3\ncomments=TTWVR Physical Lockpicking 1.1.8-r3\n", encoding="utf-8")
         profiles = json.loads((TOOLS / "target_profiles.json").read_text())
         meshes = mod / "meshes/TTWVRPhysicalLockpicking"
         required = [mod / "TTWVRLockKit.esp", assets / "kit-pinch.bin", assets / "kit-world.bin", assets / "kit-surfaces.bin",
-                    meshes / "workspace-0.nif", *[meshes / f"kit-{hand}-{tool}.nif" for hand in (0, 1) for tool in (0, 1)],
+                    meshes / "physical-key.nif", meshes / "workspace-0.nif", *[meshes / f"kit-{hand}-{tool}.nif" for hand in (0, 1) for tool in (0, 1)],
                     *[meshes / f"{kind}-{row['kind']}.nif" for row in profiles for kind in ("workspace", "world-lock")]]
         if any(not p.is_file() or p.stat().st_size == 0 for p in required):
             raise RuntimeError("Generated addon is incomplete")
@@ -145,7 +146,7 @@ def main():
         share_identical_images(assets, "*.rgba")
         share_identical_images(mod / "textures/TTWVRPhysicalLockpicking", "*.dds")
         mod.rename(output)
-    print(f"1.1.8-r2 prepared in {output}. Enable this mod and TTWVRLockKit.esp and launch TTWVR as usual.")
+    print(f"1.1.8-r3 prepared in {output}. Enable this mod and TTWVRLockKit.esp and launch TTWVR as usual.")
 
 
 if __name__ == "__main__":

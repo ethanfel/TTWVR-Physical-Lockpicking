@@ -506,6 +506,7 @@ void TickKit(GameState &g) {
   }
   g.kitSlot = (slot > 0 && slot <= 8) ? unsigned(slot) : 0;
   uintptr_t hands[2]{read<uintptr_t>(host+layout.hands), read<uintptr_t>(host+layout.hands+4)};
+  g.kitGameplay = !g.menu && (play == 0 || play == 1004);
   if (!g.kitSlot) {
     WorldPinFrame(g,hands,-1,0,0,0,0,-1,pinHealth);
     return;

@@ -1,0 +1,15 @@
+ref lockRef
+ref expectedKey
+ref ownedKey
+begin Function {lockRef expectedKey}
+ SetFunctionValue 0
+ if eval !lockRef || !expectedKey || lockRef.GetDisabled
+  return
+ endif
+ let ownedKey := Call (CompileScript "TTWVRLockKit/MatchingKey.txt") lockRef
+ if ownedKey != expectedKey
+  return
+ endif
+ lockRef.Activate player
+ SetFunctionValue 1
+end

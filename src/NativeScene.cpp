@@ -40,7 +40,9 @@ Packet packet;
 Mat xrToWorld;
 Vec xrOrigin, worldEye;
 Pose kitController[2];
-unsigned kitTracked = 0, kitOpen = 0;
+unsigned kitTracked = 0, kitOpen = 0, kitGripValid = 0, kitGrips = 0, kitTriggerValid = 0, kitTriggers = 0;
+Pose trackedEye;
+bool keyBackdrop = false;
 uint64_t kitPoseTime = 0;
 Transform workspaceWorld;
 bool calibrated = false;
@@ -304,7 +306,7 @@ bool prepare(const GameState &g, unsigned k) {
       GetCurrentThreadId());
   return !batches.empty();
 }
-bool update(const Packet &p) {
+bool update(const Packet &p, const Transform *keyPlacement = nullptr) {
   auto parent = read<Ptr>(root + 0x18);
   if (!object(parent))
     return false;
@@ -316,7 +318,8 @@ bool update(const Packet &p) {
   // The lock pose is fixed in local tracking space for this attachment.
   // Recalibrating its world placement on every head sample makes even the
   // stationary housing move when the engine camera and XR pose are out of phase.
-  if (!applied) {
+  if (keyPlacement) workspaceWorld = *keyPlacement;
+  else if (!applied) {
     workspaceWorld.rotation = mul(xrToWorld, matrix(p.scene.lock.q));
     workspaceWorld.position = xrOrigin + xrToWorld.apply(p.scene.lock.p) * units;
   }
@@ -620,6 +623,7 @@ void NativeSceneCalibration(Pose rightEye) {
   xrToWorld = rotation;
   xrOrigin = origin;
   worldEye = cam.position;
+  trackedEye = rightEye;
   calibrated = true;
   static unsigned n = 0;
   if (n++ % 600 == 0)
@@ -638,6 +642,7 @@ void NativeSceneTick(const GameState &g) {
   std::lock_guard guard(mutex);
   // A slow frame does not close the lock menu. The workspace belongs to the
   // open menu and target; controller freshness is checked separately in Current().
+  if (keyBackdrop && !g.menu) return;
   if (!g.menu || !g.target || g.menu != packet.game.menu ||
       g.target != packet.game.target || g.targetRefId != packet.game.targetRefId) {
     releaseScene();
@@ -682,23 +687,85 @@ bool NativeScenePublish(const GameState &g, const Scene &scene,
     NativeSceneTick(g);
   return NativeScenePresented(g.menu);
 }
+bool KeyCloseupPlacement(const Ergonomics &cfg, Transform &placement) {
+  std::lock_guard guard(mutex);
+  if (!calibrated || GetTickCount64() - kitPoseTime > 180) return false;
+  Pose lock = placeLock(trackedEye,cfg.lockDistance,cfg.lockBelowEyes);
+  placement = {mul(xrToWorld,matrix(lock.q)), xrOrigin+xrToWorld.apply(lock.p)*units, units};
+  return true;
+}
+bool PaintKeyCloseup(const GameState &target, const Ergonomics &cfg, const Transform &placement, float angle) {
+  // This workspace is game-thread owned. A keyed activation never creates a
+  // LockPickMenu, so it must not impersonate a menu or publish physical axes.
+  static std::unique_ptr<Renderer> renderer;
+  if (!renderer) {
+    auto next = std::make_unique<Renderer>();
+    if (!next->InitNative()) return false;
+    renderer = std::move(next);
+  }
+  Scene scene;
+  scene.config = cfg;
+  scene.config.useHolders = false;
+  scene.config.nativeScene = true;
+  scene.tools[0].visible = scene.tools[1].visible = false;
+  scene.cylinder = angle;
+  if (cfg.useTargetObject && target.closeupHiddenParts) {
+    scene.targetKind = target.targetKind;
+    scene.hiddenTargetParts = *target.closeupHiddenParts;
+    if (target.doorTurn.reverseFace) scene.targetFace = *target.doorTurn.reverseFace;
+  }
+  renderer->EnsureTarget(scene.targetKind);
+  if (!renderer->Target(scene.targetKind)) scene.targetKind = 0;
+  auto geometry = renderer->BuildScene(scene,true);
+  std::lock_guard guard(mutex);
+  if (!keyBackdrop) {
+    if (root) return false;
+    if (!prepare(target,scene.targetKind)) {
+      releaseScene();
+      return false;
+    }
+  }
+  keyBackdrop = true;
+  if (owner == target.target && update({target,scene,std::move(geometry),++serial},&placement))
+    return true;
+  releaseScene();
+  keyBackdrop = false;
+  return false;
+}
+void EndKeyCloseup() {
+  std::lock_guard guard(mutex);
+  if (keyBackdrop) releaseScene();
+  keyBackdrop = false;
+}
 bool WorldEye(Vec &p) {
   std::lock_guard guard(mutex);
   if (!calibrated || !finite(worldEye)) return false;
   p=worldEye;
   return true;
 }
-void SampleKitControllers(const Pose (&poses)[2], unsigned valid, unsigned open) {
+void SampleKitControllers(const Pose (&poses)[2], unsigned valid, unsigned open, unsigned gripValid, unsigned grips, unsigned triggerValid, unsigned triggers) {
   std::lock_guard guard(mutex);
   std::copy(poses, poses + 2, kitController);
   kitTracked = valid;
   kitOpen = open;
+  kitGripValid = gripValid;
+  kitGrips = grips;
+  kitTriggerValid = triggerValid;
+  kitTriggers = triggers;
   kitPoseTime = GetTickCount64();
 }
-bool KitControllerWorld(int hand, Transform &world, bool requireOpen) {
+bool KitControllerWorld(int hand, Transform &world, bool requireOpen, bool *gripping, bool *trigger) {
   std::lock_guard guard(mutex);
   if (!calibrated || (requireOpen && !(kitOpen & (1u << hand))) || !(kitTracked & (1u << hand)) || GetTickCount64() - kitPoseTime > 180)
     return false;
+  if (gripping) {
+    if (!(kitGripValid & (1u << hand))) return false;
+    *gripping = (kitGrips & (1u << hand)) != 0;
+  }
+  if (trigger) {
+    if (!(kitTriggerValid & (1u << hand))) return false;
+    *trigger = (kitTriggers & (1u << hand)) != 0;
+  }
   const Pose &p = kitController[hand];
   world = {mul(xrToWorld, matrix(p.q)), xrOrigin + xrToWorld.apply(p.p) * units, 1};
   return true;

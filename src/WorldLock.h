@@ -10,6 +10,7 @@ bool CompleteWorldLock(const GameState &);
 void PlayForceSeatSound();
 void InitWorldLocks(void *scripts, void *arrays, void *commands);
 int HoverLockLevel(unsigned refId);
+void TickPhysicalKey(GameState &);
 void TickVisibleLocks(uintptr_t closeupTarget);
 DoorTurn CloseupDoorTurn(const GameState &);
 bool ParkLivePin(uintptr_t mesh);

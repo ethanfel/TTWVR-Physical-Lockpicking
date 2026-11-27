@@ -27,5 +27,10 @@ begin Function {actor allowed}
  endif
  if eval (ModelHasBlock player "TTWVRKit_0_0") || (ModelHasBlock player "TTWVRKit_1_0") || (ModelHasBlock player "TTWVRKit_0_1") || (ModelHasBlock player "TTWVRKit_1_1")
   SetFunctionValue 0
+  return
+ endif
+ if eval (ModelHasBlock target "TTWVRPhysicalKey") && (Call (CompileScript "TTWVRLockKit/MatchingKey.txt") target)
+  player.AuxVarSetRef "*_TTWVRKeyCloseup" target
+  SetFunctionValue 0
  endif
 end

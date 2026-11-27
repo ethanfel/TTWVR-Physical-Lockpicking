@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "WorldLock.h"
+#include "PhysicalKey.h"
+#include "NativeScene.h"
 #include "MountedInteraction.h"
 #include "LockRules.h"
 #include "Target.h"
@@ -326,6 +328,21 @@ int twistDirection(unsigned kind, unsigned side) {
   }
   return sign[side];
 }
+void rotateHardware(const Selection &selection, const Mat &r, Vec pivot) {
+  unsigned first = mounts[selection.kind-1].style == 1 ? 3 : 1;
+  for (unsigned n = first; n < first + 2; ++n) {
+    auto node = FindSceneNode(
+        selection.hardware, "TTWVRLockHardware_" +
+                             std::string(selection.side ? "reverse_" : "front_") +
+                             std::to_string(n));
+    if (node && Readable((void *)(node + 0x34), sizeof(Transform))) {
+      auto &t = *reinterpret_cast<Transform *>(node + 0x34);
+      t.rotation = r;
+      t.position = pivot - r.apply(pivot);
+      UpdateSceneNode(node);
+    }
+  }
+}
 void plug(float angle,bool updatePlug=true) {
   if (!current(active) || !active.hardware ||
       read<Ptr>(active.hardware + 0x18) != active.root)
@@ -353,19 +370,7 @@ void plug(float angle,bool updatePlug=true) {
     UpdateSceneNode(parkedMesh);
   }
   if (!updatePlug) return;
-  unsigned first = m.style == 1 ? 3 : 1;
-  for (unsigned n = first; n < first + 2; ++n) {
-    auto node = FindSceneNode(
-        active.hardware, "TTWVRLockHardware_" +
-                             std::string(active.side ? "reverse_" : "front_") +
-                             std::to_string(n));
-    if (node && Readable((void *)(node + 0x34), sizeof(Transform))) {
-      auto &t = *reinterpret_cast<Transform *>(node + 0x34);
-      t.rotation = r;
-      t.position = pivot - r.apply(pivot);
-      UpdateSceneNode(node);
-    }
-  }
+  rotateHardware(active,r,pivot);
 }
 void releaseContact(bool restorePlug) {
   RestoreWorldDriver();
@@ -529,6 +534,112 @@ end)");
   }
   Log("live_witness_support enabled=%d", findWitness != nullptr);
 }
+
+struct KeySession {
+  Selection target;
+  Ptr mesh = 0, form = 0;
+  PhysicalKey gesture;
+  Transform closePlacement;
+  GameState backdrop;
+  bool closeup = false, switchRequested = false;
+  unsigned triggerArmed = 0;
+  float drawnAngle = 0;
+  int direction = 1;
+  ULONGLONG lastTracked = 0;
+};
+KeySession key;
+ULONGLONG nextKeyScan = 0, nextKeyRequest = 0;
+void *matchingKey = nullptr, *useKey = nullptr, *keyAttach = nullptr, *keyForget = nullptr, *keyRequest = nullptr;
+bool keyScripts() {
+  static bool initialized = false;
+  if (!initialized) {
+    initialized = true;
+    matchingKey = api->compile(R"(ref rTarget
+begin Function {rTarget}
+ SetFunctionValue (Call (CompileScript "TTWVRLockKit/MatchingKey.txt") rTarget)
+end)");
+    useKey = api->compile(R"(ref rTarget
+ref rKey
+begin Function {rTarget rKey}
+ SetFunctionValue (Call (CompileScript "TTWVRLockKit/UseKey.txt") rTarget rKey)
+end)");
+    auto attachment = [](int flag) {
+      char txt[220];
+      snprintf(txt,sizeof(txt),"ref rTarget\nbegin Function {rTarget}\nSetFunctionValue "
+          "(AttachModel rTarget %d \"TTWVRPhysicalLockpicking\\physical-key.nif\")\nend",flag);
+      return api->compile(txt);
+    };
+    keyAttach = attachment(3);
+    keyForget = attachment(0);
+    keyRequest = api->compile(R"(ref asked
+begin Function {}
+ let asked := player.AuxVarGetRef "*_TTWVRKeyCloseup"
+ if asked
+  player.AuxVarErase "*_TTWVRKeyCloseup"
+  SetFunctionValue asked
+ endif
+end)");
+  }
+  return matchingKey && useKey && keyAttach && keyForget && keyRequest;
+}
+Ptr ownedKey(Ptr ref) {
+  Element e;
+  return api->call(matchingKey,nullptr,nullptr,&e,1,ref) && e.type == 2
+         ? Ptr(e.data.form) : 0;
+}
+void keyPlug(const Selection &t, float angle) {
+  if (!current(t) || !t.hardware || read<Ptr>(t.hardware+0x18) != t.root) return;
+  const auto b = basis(t);
+  const auto &m = mounts[t.kind-1];
+  const Mat rotation = mul(mul(b,matrix(axisAngle({0,0,1},-angle*pi/180))),b.transpose());
+  rotateHardware(t,rotation,m.anchors[t.side]+b.apply({0,0,.013f/m.scale}));
+}
+void resetPhysicalKey() {
+  if (key.closeup) EndKeyCloseup();
+  else if (key.drawnAngle != 0) keyPlug(key.target,0);
+  ReleaseMountedChild(key.mesh);
+  key = {};
+}
+struct KeyOffer { Selection selection; Ptr form = 0; };
+KeyOffer nearbyKey(Vec eye) {
+  std::vector<std::pair<float,Selection>> candidates;
+  for (const auto &entry : visible) {
+    auto t = entry.second.target;
+    if (!entry.second.nearby || !current(t) || read<Ptr>(t.hardware+0x18) != t.root) continue;
+    for (unsigned side=0; side<=mounts[t.kind-1].reverse; ++side) {
+      t.side = side;
+      const auto mount = frame(t);
+      float distance = length(eye-mount.origin);
+      if (distance > 125 || mount.point(eye).z < -.012f) continue;
+      candidates.emplace_back(distance,t);
+    }
+  }
+  std::sort(candidates.begin(),candidates.end(),[](const auto &a,const auto &b){return a.first < b.first;});
+  for (const auto &candidate : candidates)
+    if (Ptr form = ownedKey(candidate.second.ref)) return {candidate.second,form};
+  return {};
+}
+bool offerPhysicalKey(KeyOffer offer, ULONGLONG now) {
+  auto &t = offer.selection;
+  Element e;
+  if (!api->call(keyAttach,nullptr,nullptr,&e,1,t.ref) || e.type!=1 || e.data.number<=0)
+    return false;
+  Ptr mesh = FindSceneNode(t.root,"TTWVRPhysicalKey");
+  api->call(keyForget,nullptr,nullptr,&e,1,t.ref);
+  if (!mesh || read<Ptr>(mesh+0x18)!=t.root) return false;
+  RetainSceneNode(mesh);
+  key.target = t;
+  key.mesh = mesh;
+  key.form = offer.form;
+  key.direction = read<uint8_t>(read<Ptr>(t.ref+0x20)+4)==0x1c ? twistDirection(t.kind,t.side) : 1;
+  key.lastTracked = now;
+  Log("physical_key_offered ref=%08x key=%08x side=%u",t.id,read<unsigned>(key.form+0xc),t.side);
+  return true;
+}
+bool useMatchingKey(Ptr ref, Ptr form) {
+  Element result;
+  return api->call(useKey,nullptr,nullptr,&result,2,ref,form) && result.type==1 && result.data.number==1;
+}
 } // namespace
 void PlayForceSeatSound() {
   // Play the stock mechanical detent once, through the lock menu's 2D audio path.
@@ -546,6 +657,135 @@ int HoverLockLevel(unsigned id) {
   if (!base || (type != 0x1b && type != 0x1c)) return -1;
   ensureWorldAction();
   return call(action,ref,3) - 1;
+}
+void TickPhysicalKey(GameState &g) {
+  if (!ready || !NativeReady() || !g.kitGameplay || g.menu || g.kitDrawn || g.holsterEditing || finishing || HasParkedPin()) {
+    if (key.mesh) resetPhysicalKey();
+    return;
+  }
+  Vec eye;
+  if (!WorldEye(eye) || !keyScripts()) return;
+  auto now = GetTickCount64();
+  const auto mountEntry=visible.find(key.target.id);
+  if (key.mesh && (mountEntry==visible.end() || mountEntry->second.target.hardware!=key.target.hardware ||
+      !current(key.target) || read<Ptr>(key.mesh+0x18) != key.target.root ||
+      read<Ptr>(key.target.hardware+0x18) != key.target.root || !locked(key.target.ref) ||
+      length(eye-frame(key.target).origin)>145)) resetPhysicalKey();
+  if (now >= nextKeyScan) {
+    nextKeyScan = now + 350;
+    if (key.mesh && (key.closeup || key.gesture.owner>=0 || key.gesture.seated)) {
+      if (ownedKey(key.target.ref)!=key.form) resetPhysicalKey();
+    } else {
+      const auto offer = nearbyKey(eye);
+      if (offer.selection.ref!=key.target.ref || offer.form!=key.form || offer.selection.side!=key.target.side) {
+        resetPhysicalKey();
+        if (offer.form) offerPhysicalKey(offer,now);
+      }
+    }
+  }
+  if (!key.mesh) return;
+  g.keyAvailable = true;
+  auto mount = frame(key.target);
+  Transform placement{mount.r,mount.origin+mount.r.apply({0,0,.013f/mount.factor}),1/mount.factor};
+  bool switchView = key.switchRequested;
+  key.switchRequested = false;
+  if (now >= nextKeyRequest) {
+    nextKeyRequest = now+65;
+    Element request;
+    if (api->call(keyRequest,nullptr,nullptr,&request,0) && request.type==2 && Ptr(request.data.form)==key.target.ref) switchView = true;
+  }
+  if (switchView) {
+    if (key.closeup) {
+      resetPhysicalKey();
+      nextKeyScan = now+350;
+      return;
+    }
+    key.backdrop.target = key.target.ref;
+    UpdateTarget(key.backdrop);
+    key.backdrop.closeupHiddenParts = CloseupHiddenParts(key.backdrop);
+    key.backdrop.doorTurn = CloseupDoorTurn(key.backdrop);
+    if (!KeyCloseupPlacement(settings,key.closePlacement) ||
+        !PaintKeyCloseup(key.backdrop,settings,key.closePlacement,0)) {
+      Log("physical_key_closeup_unavailable ref=%08x",key.target.id);
+      return; // The live key remains usable. Only a completed turn may activate it.
+    }
+    if (key.drawnAngle!=0) keyPlug(key.target,0);
+    key.closeup = true;
+    key.gesture = {};
+    key.drawnAngle = 0;
+    Log("physical_key_closeup ref=%08x",key.target.id);
+  }
+  if (key.closeup) placement = key.closePlacement;
+  Transform hands[2]; unsigned tracked=0,grips=0,triggers=0;
+  for (int h=0;h<2;++h) {
+    bool held=false, trigger=false; Transform world;
+    if (!KitControllerWorld(h,world,false,&held,&trigger)) continue;
+    if (trigger) triggers |= 1u<<h;
+    tracked |= 1u<<h;
+    if (held) grips |= 1u<<h;
+    hands[h]=relativeTransform(world,placement);
+  }
+  if (tracked) key.lastTracked=now;
+  else if (now-key.lastTracked>1000) {
+    resetPhysicalKey();
+    nextKeyScan=now+550;
+    return;
+  }
+  const bool wasSeated=key.gesture.seated;
+  key.gesture.step(hands,tracked,grips,key.direction,settings.fullTurnWrist);
+  g.keyGripMask=key.gesture.inReach | (key.gesture.owner>=0 ? 1u<<key.gesture.owner : 0u);
+  // A deliberate trigger press on the bow also offers the close-up for
+  // hosts whose custom activation bypasses the normal player activation event.
+  if (key.gesture.owner < 0 && (triggers & key.triggerArmed & key.gesture.inReach & ~grips))
+    key.switchRequested = true;
+  key.triggerArmed = tracked & ~triggers;
+  static const bool keyTrace = GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE",nullptr,0)>0;
+  static ULONGLONG traceAt = 0;
+  if (keyTrace && now>=traceAt) {
+    traceAt=now+350;
+    Vec bow, axis, palm[2]{};
+    const auto toTracking=[&](Vec p,Vec &out) {
+      return WorldToTracking(placement.position+placement.rotation.apply(p)*placement.scale,out);
+    };
+    Vec resting{0,0,PhysicalKey::restZ+PhysicalKey::bowZ};
+    if (toTracking(resting,bow) && toTracking(resting+Vec{0,0,.05f},axis)) {
+      for (int h=0;h<2;++h) if (tracked&(1u<<h)) toTracking(hands[h].position,palm[h]);
+      axis=axis-bow;
+      Log("physical_key_sample mode=%s bow=%.4f,%.4f,%.4f travel=%.4f,%.4f,%.4f left=%.4f,%.4f,%.4f right=%.4f,%.4f,%.4f grips=%u tracked=%u hand=%d direction=%d turn=%.1f",
+          key.closeup?"closeup":"live",bow.x,bow.y,bow.z,axis.x,axis.y,axis.z,
+          palm[0].x,palm[0].y,palm[0].z,palm[1].x,palm[1].y,palm[1].z,
+          grips,tracked,key.gesture.owner,key.direction,key.gesture.angle);
+    }
+  }
+  if (!wasSeated && key.gesture.seated) {
+    sound(0x10745e0,0x121);
+    Log("physical_key_seated ref=%08x mode=%s hand=%d",key.target.id,key.closeup?"closeup":"live",key.gesture.owner);
+  }
+  const Transform parent=read<Transform>(key.target.root+0x68);
+  if (!(parent.scale>.0001f)) { resetPhysicalKey(); return; }
+  auto local=relativeTransform(childWorld(placement,key.gesture.pose),parent);
+  auto &previous=*reinterpret_cast<Transform*>(key.mesh+0x34);
+  if (memcmp(&previous,&local,sizeof(local))) {
+    previous=local;
+    UpdateSceneNode(key.mesh);
+  }
+  if (key.drawnAngle!=key.gesture.angle) {
+    float angle=key.gesture.angle*key.direction;
+    if (key.closeup) {
+      if (!PaintKeyCloseup(key.backdrop,settings,placement,angle)) { resetPhysicalKey(); return; }
+    } else keyPlug(key.target,angle);
+    key.drawnAngle=key.gesture.angle;
+  }
+  if (key.gesture.complete) {
+    const auto t=key.target;
+    const auto form=key.form;
+    resetPhysicalKey(); // Remove our pre-activation marker before invoking Fallout.
+    const bool called=useMatchingKey(t.ref,form);
+    Log("physical_key_turned ref=%08x activated=%d",t.id,called);
+    nextKeyScan=now+500;
+    g.keyAvailable=false;
+    g.keyGripMask=0;
+  }
 }
 void InitWorldLocks(void *scripts, void *arrayInterface, void *commandTable) {
   commands = static_cast<CommandTable *>(commandTable);
@@ -709,6 +949,7 @@ void TakeLivePin() {
   discardParkedPin();
 }
 void ResetWorldLock(bool unloading) {
+  if (unloading) resetPhysicalKey();
   clear(unloading);
   reportedRef = reportedOwner = 0;
   nextWitnessCheck = 0;

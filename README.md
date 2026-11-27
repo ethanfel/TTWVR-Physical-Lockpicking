@@ -2,7 +2,7 @@
 
 Pick a door, safe or ammo box with both hands in VR. Draw the bobby pin and screwdriver from one holster, bend the pin, then feel the lock resist as you twist the screwdriver.
 
-**[Download the ready-to-play 1.1.8-r2 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/1.1.8-r2/TTWVR-Physical-Lockpicking-1.1.8-r2-Ready-to-Play.zip)**
+**[Download the ready-to-play 1.1.8-r3 ZIP](https://github.com/ethanfel/TTWVR-Physical-Lockpicking/releases/download/1.1.8-r3/TTWVR-Physical-Lockpicking-1.1.8-r3-Ready-to-Play.zip)**
 
 ## Install
 
@@ -17,6 +17,12 @@ When updating, keep a copy of your customized `NVSE/Plugins/TTWVRPhysicalLockpic
 For a manual installation, back up any matching files in `Fallout New Vegas/Data`, then copy the ZIP contents directly into that folder and enable the ESP. `TTWVRLockKit.esp` should sit alongside `FalloutNV.esm`.
 
 The addon takes controller input and haptics from the backend TTWVR selects, including OpenVR and OpenXR. The same ZIP works with stock textures and optional texture packs such as NMC. Install the same ZIP on Windows or Linux. Python, asset conversion, OpenXR registration and extra launch options are unnecessary.
+
+## When you have the key
+
+Approach a supported locked door or container with your tools stowed. If you own its matching key, a worn metal key appears at the keyhole. Grip its head with either hand, push it into the slot, then turn your wrist. Left-mounted door locks turn clockwise and right-mounted ones turn counterclockwise. Containers turn clockwise.
+
+For the close-up, tap **trigger** beside the key, then use the same grip, push and turn. To leave early, release the grip and tap trigger beside the key again. Regular player activation also opens this view while the key is showing. Fallout handles the actual keyed activation, including any scripts on the door or container. This works with zero bobby pins and at any Lockpick skill.
 
 ## Your first lock
 

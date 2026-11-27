@@ -68,6 +68,7 @@ def main():
             manifest = 'XR_APILAYER_TTWVR_physical_lockpicking.json'
             add(ROOT/'manifest'/manifest,(assets/manifest).relative_to(base))
             add(base/'TTWVRLockKit.esp')
+            add(base/meshes/'physical-key.nif')
             for script in sorted((ROOT/'kit').rglob('*.txt')):
                 add(script,script.relative_to(ROOT/'kit'))
             packages = sorted((base/'Shaders').glob('*.sdp'))

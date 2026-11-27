@@ -21,6 +21,8 @@ struct GameState {
   unsigned kitSlot = 0, kitDrawn = 0, kitHands = 0;
   Vec kitCenters[8]{};
   float kitRadii[8]{};
+  bool keyAvailable = false;
+  unsigned keyGripMask = 0;
   bool kitGameplay = false, holsterEditing = false, drawToolsByButton = false;
   Vec kitPalms[2]{}, kitFingerPads[2]{};
   unsigned kitFingerPadsValid = 0;
@@ -58,8 +60,9 @@ void InitFolder();
 bool NativeReady();
 uintptr_t FindSceneNode(uintptr_t root, const std::string &name);
 struct Transform;
-void SampleKitControllers(const Pose (&poses)[2], unsigned valid, unsigned open);
-bool KitControllerWorld(int hand, Transform &world, bool requireOpen = false);
+void SampleKitControllers(const Pose (&poses)[2], unsigned valid, unsigned open, unsigned gripValid, unsigned grips,
+                          unsigned triggerValid, unsigned triggers);
+bool KitControllerWorld(int hand, Transform &world, bool requireOpen = false, bool *gripping = nullptr, bool *trigger = nullptr);
 void RequestForceLock(const GameState &);
 void RequestForceSeatSound(const GameState &);
 bool NativeForceLock(const GameState &);

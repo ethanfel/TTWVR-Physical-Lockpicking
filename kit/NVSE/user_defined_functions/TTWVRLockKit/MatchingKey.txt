@@ -1,0 +1,18 @@
+ref lockRef
+ref keyForm
+ref otherDoor
+begin Function {lockRef}
+ if eval !lockRef || !(lockRef.GetLocked)
+  return
+ endif
+ let keyForm := lockRef.GetOpenKey
+ if eval !keyForm && (lockRef.GetType == 28)
+  let otherDoor := lockRef.GetLinkedDoor
+  if eval otherDoor && otherDoor.GetLocked
+   let keyForm := otherDoor.GetOpenKey
+  endif
+ endif
+ if eval keyForm && (player.GetItemCount keyForm > 0)
+  SetFunctionValue keyForm
+ endif
+end
