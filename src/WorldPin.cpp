@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "WorldPin.h"
 #include "ArmContact.h"
+#include "PhysicalKey.h"
 #include "ToolGeometry.h"
 #include "WorldLock.h"
 #include <chrono>
@@ -13,15 +14,16 @@ template <class T> T *field(uintptr_t node, unsigned offset) {
   auto *p = reinterpret_cast<T *>(node + offset);
   return node && Readable(p, sizeof(T)) ? p : nullptr;
 }
-enum class Grip { None, Pin, Driver };
+enum class Grip { None = -1, Pin, Driver, Key };
 constexpr int jointCount = 15;
 struct HandRig {
   uintptr_t hand = 0, bones[jointCount]{};
   Mat saved[jointCount]{};
   Grip pose = Grip::None;
   uintptr_t upper=0, fore=0, sleeve=0, tool=0;
-  Vec contactOffset{};
-  bool shifted=false;
+  Vec contactOffset{}, keyPinch{}, keyAxis{};
+  bool shifted=false, keyReach=false;
+  Vec shoulderRaw{}, shoulderShown{};
   Transform goal, toolFit, presentedFore;
   Vec presentedWrist;
   Mat raw[3], shown[3];
@@ -29,8 +31,8 @@ struct HandRig {
 
 };
 HandRig rigs[2];
-Mat fitted[2][2][jointCount];
-int fittedCount[2]{};
+Mat fitted[2][3][jointCount];
+int fittedCount[3]{};
 int driverOwner = -1;
 bool loaded = false, tried = false;
 int owner = -1, helper = -1;
@@ -55,12 +57,16 @@ void restoreArm(HandRig &r) {
   for (int i=0;i<3;++i)
     if (auto *rotation=field<Mat>(nodes[i],0x34))
       if (std::memcmp(rotation,&r.shown[i],sizeof(Mat))==0) *rotation=r.raw[i];
+  if (r.keyReach)
+    if (auto *upper=field<Transform>(r.upper,0x34))
+      if (std::memcmp(&upper->position,&r.shoulderShown,sizeof(Vec))==0) upper->position=r.shoulderRaw;
   if (auto *tool=field<Transform>(r.tool,0x34))
     if (std::memcmp(tool,&r.shownTool,sizeof(Transform))==0) *tool=r.toolFit;
 }
 void removeContact(HandRig &r) {
   restoreArm(r);
   r.shifted=false;
+  r.keyReach=false;
   r.contactOffset={};
   r.tool=0;
 }
@@ -73,7 +79,17 @@ void applyContact(HandRig &r) {
   restoreArm(r);
   Transform reached;
   r.raw[0]=upper->rotation; r.raw[1]=fore->rotation; r.raw[2]=hand->rotation;
-  if (!contactArm(*parent,*upper,*fore,*hand,r.goal,reached)) return;
+  r.shoulderRaw=upper->position;
+  if (r.keyReach && parent->scale>.0001f) {
+    const Vec toWrist=parent->rotation.transpose().apply(r.goal.position-parent->position)*(1.f/parent->scale);
+    const float arm=(length(fore->position)+length(hand->position)*fore->scale)*upper->scale;
+    upper->position=reachJoint(upper->position,toWrist,arm);
+  }
+  r.shoulderShown=upper->position;
+  if (!contactArm(*parent,*upper,*fore,*hand,r.goal,reached)) {
+    upper->position=r.shoulderRaw;
+    return;
+  }
   r.presentedWrist=reached.position;
   r.presentedFore=childWorld(childWorld(*parent,*upper),*fore);
   r.shown[0]=upper->rotation; r.shown[1]=fore->rotation; r.shown[2]=hand->rotation;
@@ -88,12 +104,13 @@ void applyContact(HandRig &r) {
   }
   r.shifted=true;
 }
-void setContact(int h,Vec offset,Mat turn,uintptr_t tool) {
+void setContact(int h,Vec offset,Mat turn,uintptr_t tool,bool keyReach=false) {
   auto &r=rigs[h];
   auto *w=field<Transform>(r.hand,0x68);
   static const Mat identity;
   if (!w || !r.upper || (length(offset)<.0001f &&
       std::memcmp(&turn,&identity,sizeof(Mat))==0)) return;
+  r.keyReach=keyReach;
   r.contactOffset=offset;
   r.goal={mul(turn,w->rotation),w->position+offset,w->scale};
   r.tool=tool;
@@ -143,7 +160,7 @@ void __cdecl restoreWithPin(uintptr_t hand, const char *name, void *snapshot,
     auto &r = rigs[h];
     if (r.hand != hand || r.pose == Grip::None)
       continue;
-    const int pose = r.pose == Grip::Driver;
+    const int pose = static_cast<int>(r.pose);
     for (int j = 0; j < fittedCount[pose]; ++j)
       if (auto *rotation = field<Mat>(r.bones[j], 0x34))
         *rotation = fitted[h][pose][j];
@@ -182,7 +199,16 @@ void loadFit() {
   char magic[8];
   if (fread(magic, 1, 8, f) == 8) {
     if (!memcmp(magic, "TTWGrip2", 8)) {
-      loaded = fread(fitted, 1, sizeof(fitted), f) == sizeof(fitted);
+      loaded = true;
+      for (int h=0; h<2; ++h)
+        loaded &= fread(fitted[h], sizeof(Mat), 2*jointCount, f) == 2*jointCount;
+      char tail[8];
+      if (loaded && fread(tail,1,8,f)==8 && !memcmp(tail,"TTWKeyG1",8)) {
+        bool complete=true;
+        for (int h=0; h<2; ++h)
+          complete &= fread(fitted[h][2],sizeof(Mat),jointCount,f)==jointCount;
+        if (complete) fittedCount[2]=jointCount;
+      }
       fittedCount[0] = fittedCount[1] = jointCount;
     } else if (!memcmp(magic, "TTWGrip1", 8)) {
       loaded = true;
@@ -220,12 +246,30 @@ void bindRig(int h, uintptr_t hand) {
   }
   for (int j = 0; j < jointCount; ++j)
     r.bones[j] = FindSceneNode(hand, prefix + digits[j / 3] + ends[j % 3]);
+  if (!fittedCount[2]) return;
+  Vec contact[2];
+  for (int digit=0; digit<2; ++digit) {
+    Transform endpoint;
+    for (int i=0; i<3; ++i) {
+      const int j=3*digit+i;
+      const auto *joint=field<Transform>(r.bones[j],0x34);
+      if (!joint) return;
+      auto local=*joint;
+      local.rotation=fitted[h][2][j];
+      endpoint=childWorld(endpoint,local);
+    }
+    // Thumb pulp and the opposing side of the curled index, in bone units.
+    Vec surface=digit ? Vec{1.13f,-.60f,h ? .18f : -.18f} : Vec{1.45f,.57f,0};
+    contact[digit]=endpoint.position+endpoint.rotation.apply(surface)*endpoint.scale;
+  }
+  r.keyPinch=(contact[0]+contact[1])*.5f;
+  r.keyAxis=normal(contact[0]-contact[1]);
 }
 void poseRig(int h, Grip wanted) {
   auto &r = rigs[h];
   if (!r.hand || !loaded || (r.pose == Grip::None && wanted == Grip::None))
     return;
-  const int old = r.pose == Grip::Driver, next = wanted == Grip::Driver;
+  const int old = static_cast<int>(r.pose), next = static_cast<int>(wanted);
   for (int j = 0; j < jointCount; ++j) {
     auto *rotation = field<Mat>(r.bones[j], 0x34);
     if (!rotation)
@@ -373,7 +417,68 @@ void ResetWorldPin() {
   opening = twist = 0;
   meshOpening = -1;
 }
-bool KeyFingerContact(int hand, Vec &world) { return pads(hand,world); }
+// The fitted contact is wrist-local. Read the animated arm before posing it,
+// so the rendered correction can never feed back into controller tracking.
+static Mat alignKeyFaces(const HandRig &r,const Transform &wrist,const Mat &key) {
+  const Vec axis=wrist.rotation.apply(r.keyAxis);
+  Vec face=key.apply({1,0,0});
+  if (dot(axis,face)<0) face=face*-1.f;
+  return matrix(shortestArc(axis,face));
+}
+bool KeyFingerContact(int h, Vec &world) {
+  const auto &r=rigs[h];
+  const auto *w=field<Transform>(r.hand,0x68);
+  if (!w || length(r.keyAxis)<.5f) return pads(h,world);
+  world=w->position+w->rotation.apply(r.keyPinch)*w->scale;
+  return finite(world);
+}
+static bool keyArmReach(const HandRig &r,Vec &origin,float &reach) {
+  const auto *base=field<uintptr_t>(r.upper,0x18);
+  const auto *collar=base ? field<Transform>(*base,0x68) : nullptr;
+  const auto *shoulder=field<Transform>(r.upper,0x68), *elbow=field<Transform>(r.fore,0x68);
+  const auto *w=field<Transform>(r.hand,0x68);
+  if (!collar || !shoulder || !elbow || !w) return false;
+  origin=collar->position;
+  reach=length(shoulder->position-origin)+length(elbow->position-shoulder->position)
+      +length(w->position-elbow->position);
+  return reach>.01f;
+}
+void LimitKeyReach(int h,Transform &grip) {
+  const auto &r=rigs[h];
+  const auto *w=field<Transform>(r.hand,0x68);
+  Vec origin; float reach;
+  if (!w || length(r.keyAxis)<.5f || !keyArmReach(r,origin,reach)) return;
+  grip.position=origin+bounded(grip.position-origin,reach+length(r.keyPinch)*w->scale);
+}
+void PresentKeyGrip(int h, const Transform &keyWorld) {
+  auto &r=rigs[h];
+  if (length(r.keyAxis)<.5f) return;
+  if (r.pose!=Grip::Key) poseRig(h,Grip::Key);
+  const auto *w=field<Transform>(r.hand,0x68);
+  if (!w || !(keyWorld.scale>0)) return;
+  const Vec bow=keyWorld.position+keyWorld.rotation.apply({0,0,PhysicalKey::bowZ})*keyWorld.scale;
+  Mat turn=alignKeyFaces(r,*w,keyWorld.rotation);
+  Vec wristToBow=turn.apply(w->rotation.apply(r.keyPinch)*w->scale);
+  Vec origin; float reach;
+  if (keyArmReach(r,origin,reach) && length(bow-origin-wristToBow)>reach) {
+    // When turning a seated key at full extension the wrist can swivel
+    // around the pinch. Keep the fingertips on the head throughout the turn.
+    const Vec admitted=reachJoint(wristToBow,bow-origin,reach);
+    turn=mul(matrix(shortestArc(wristToBow,admitted)),turn);
+    wristToBow=admitted;
+  }
+  setContact(h,bow-(w->position+wristToBow),turn,0,true);
+  static const bool trace=GetEnvironmentVariableW(L"TTWVR_LOCK_KIT_TRACE",nullptr,0)>0;
+  static ULONGLONG report=0;
+  if (trace && GetTickCount64()>=report) {
+    Vec actual;
+    if (KeyFingerContact(h,actual))
+      Log("key_grip hand=%d center_error_mm=%.1f face_dot=%.3f",h,
+          length(actual-bow)*1000.f/keyWorld.scale,
+          std::abs(dot(w->rotation.apply(r.keyAxis),keyWorld.rotation.apply({1,0,0}))));
+    report=GetTickCount64()+350;
+  }
+}
 void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
                    unsigned down, unsigned pressed, unsigned valid,
                    unsigned nearKit, int driverHand, float &pinHealth) {
@@ -411,7 +516,8 @@ void WorldPinFrame(GameState &g, const uintptr_t hands[2], int pinHand,
       removeContact(rigs[h]);
       UpdateSceneNode(rigs[h].upper);
     }
-    poseRig(h, (!parked && h == owner) || h == helper || h == PhysicalKeyHand() ? Grip::Pin
+    poseRig(h, h == PhysicalKeyHand() && length(rigs[h].keyAxis)>.5f ? Grip::Key
+               : (!parked && h == owner) || h == helper || h == PhysicalKeyHand() ? Grip::Pin
                : h == driverHand         ? Grip::Driver
                                          : Grip::None);
     if (parked && h != driverHand && NearParkedPin(h, g.worldUnitsPerMeter))

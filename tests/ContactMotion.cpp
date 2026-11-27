@@ -11,6 +11,17 @@ float qdistance(Quat a, Quat b) {
   return 1 - std::abs(a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w);
 }
 int main() {
+  for (float side : {-1.f, 1.f}) {
+    const Vec shoulder{side*10,0,0};
+    const float arm=40;
+    assert(length(reachJoint(shoulder,{side*10,30,0},arm)-shoulder)==0);
+    const Vec extended{side*3,46,0};
+    const Vec reached=reachJoint(shoulder,extended,arm);
+    assert(std::abs(length(reached)-length(shoulder))<.001f);
+    assert(std::abs(length(reached-extended)-arm)<.001f);
+    const Vec beyond{0,51,0};
+    assert(length(reachJoint(shoulder,beyond,arm)-Vec{0,10,0})<.001f);
+  }
   // The sleeve follows the weapon rig in either hand even across 180 degrees.
   for (float angle : {0.f,.6f,2.6f,3.14f,3.16f,4.f,-3.16f}) {
     const Vec axis = normal({.3f,-.8f,.5f});

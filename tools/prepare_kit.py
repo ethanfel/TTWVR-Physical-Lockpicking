@@ -10,7 +10,7 @@ from pathlib import Path
 import shutil
 import struct
 import numpy as np
-from prepare_hands import NifFormat as N, bsa_file, fit_driver_grip, fit_pinch, matrix
+from prepare_hands import NifFormat as N, bsa_file, fit_driver_grip, fit_pinch, finger_solver, matrix
 from prepare_world_locks import make_shape
 from test_stage.build import record, group, z
 from pin_mesh import dimensions
@@ -78,6 +78,33 @@ def fit_driver(v):
     v[:, 3:6] /= np.maximum(np.linalg.norm(v[:, 3:6], axis=1)[:, None], 1.0e-10)
 
 
+def key_grip(bind, prefix, hand):
+    # Curl the index and lay the thumb pad against it, with room for the
+    # 5.74 mm thick head of Key01Dirty. Mirror spread and roll at the wrist.
+    sign = 1 if hand else -1
+    finger = finger_solver(bind, prefix)
+    pose = finger("Finger1", [44.1, 55.8, 52.9], sign * 8.2, sign * -15.9)
+    pose.update(finger("Thumb1", [18.5, 38.6, 7.3], sign * -31.8, sign * -65))
+    for digit in ("Finger2", "Finger3", "Finger4"):
+        pose.update(finger(digit, [35, 50, 35]))
+    return pose
+
+
+def grip_rotations(bind, prefix, pose):
+    rotations = bytearray()
+    for digit in ("Thumb1", "Finger1", "Finger2", "Finger3", "Finger4"):
+        parent = bind[prefix + "Hand"]
+        for suffix in ("", "1", "2"):
+            child = pose[prefix + digit + suffix]
+            local = child @ np.linalg.inv(parent)
+            rotation = local[:3, :3].T
+            if not np.isfinite(rotation).all() or not np.isclose(np.linalg.det(rotation), 1, atol=.001):
+                raise ValueError(f"Invalid {prefix}{digit}{suffix} grip rotation")
+            rotations.extend(np.asarray(rotation, dtype="<f4").tobytes())
+            parent = child
+    return rotations
+
+
 def build(output, assets, data, hand_mod=None):
     output.mkdir(parents=True, exist_ok=True)
     # Hidden inventory token stores the vanilla hotkey for a Misc bobby pin.
@@ -143,6 +170,7 @@ def build(output, assets, data, hand_mod=None):
     out = output / "meshes/TTWVRPhysicalLockpicking"
     out.mkdir(parents=True, exist_ok=True)
     rig = bytearray(b"TTWGrip2")
+    key_rig = bytearray(b"TTWKeyG1")
     frames = bytearray(b"TTWLive1")
     off = 8
     for hand in range(2):
@@ -162,16 +190,8 @@ def build(output, assets, data, hand_mod=None):
         pinch_pose, _, _ = fit_pinch(bind, prefix)
         driver_pose, _, _ = fit_driver_grip(bind, prefix, hand)
         for pose in (pinch_pose, driver_pose):
-            for digit in ("Thumb1", "Finger1", "Finger2", "Finger3", "Finger4"):
-                parent = bind[prefix + "Hand"]
-                for suffix in ("", "1", "2"):
-                    child = pose[prefix + digit + suffix]
-                    local = child @ np.linalg.inv(parent)
-                    rotation = local[:3, :3].T
-                    if not np.isfinite(rotation).all() or not np.isclose(np.linalg.det(rotation), 1, atol=.001):
-                        raise ValueError(f"Invalid {prefix}{digit}{suffix} grip rotation")
-                    rig.extend(np.asarray(rotation, dtype="<f4").tobytes())
-                    parent = child
+            rig.extend(grip_rotations(bind, prefix, pose))
+        key_rig.extend(grip_rotations(bind, prefix, key_grip(bind, prefix, hand)))
         sign = 1 if hand == 0 else -1
         for tool in range(2):
             root = N.NiNode()
@@ -234,7 +254,7 @@ def build(output, assets, data, hand_mod=None):
     assert off == len(hands)
     output_rig = output / "NVSE/Plugins/TTWVRPhysicalLockpicking/kit-pinch.bin"
     output_rig.parent.mkdir(parents=True, exist_ok=True)
-    output_rig.write_bytes(rig)
+    output_rig.write_bytes(rig + key_rig)
     profiles = json.loads(Path(__file__).with_name("target_profiles.json").read_text())
     frames.extend(struct.pack("<I", len(profiles)))
     for kind, profile in enumerate(profiles, 1):

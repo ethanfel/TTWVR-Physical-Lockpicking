@@ -737,7 +737,7 @@ void TickPhysicalKey(GameState &g) {
     tracked |= 1u<<h;
     if (held) grips |= 1u<<h;
     // Fit the bow to the fingertips at pickup. Once held, keep this rigid
-    // offset in the controller frame even when the avatar arm reaches its limit.
+    // offset in the controller frame throughout the carry and turn.
     if (key.gesture.owner != h) {
       Vec fingers;
       key.gripOffsets[h] = KeyFingerContact(h,fingers)
@@ -745,6 +745,7 @@ void TickPhysicalKey(GameState &g) {
                     (1 / g.worldUnitsPerMeter), .095f) : Vec{};
     }
     world.position = world.position + world.rotation.apply(key.gripOffsets[h])*g.worldUnitsPerMeter;
+    if (held && !key.gesture.seated) LimitKeyReach(h,world);
     hands[h]=relativeTransform(world,placement);
   }
   if (tracked) key.lastTracked=now;
@@ -804,7 +805,9 @@ void TickPhysicalKey(GameState &g) {
   auto &flags=*reinterpret_cast<uint32_t *>(key.mesh+0x30);
   const bool visibleKey=key.closeup || key.gesture.owner>=0 || key.gesture.seated;
   if (visibleKey) flags &= ~1u; else flags |= 1u;
-  auto local=relativeTransform(childWorld(placement,key.gesture.pose),parent);
+  auto keyWorld=childWorld(placement,key.gesture.pose);
+  if (key.gesture.owner >= 0) PresentKeyGrip(key.gesture.owner,keyWorld);
+  auto local=relativeTransform(keyWorld,parent);
   auto &previous=*reinterpret_cast<Transform*>(key.mesh+0x34);
   if (memcmp(&previous,&local,sizeof(local))) {
     previous=local;

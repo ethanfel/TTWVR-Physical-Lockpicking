@@ -31,6 +31,19 @@ inline Mat fitSleeveToWrist(Mat roll, Vec toWrist) {
   if (!finite(toWrist) || length(toWrist)<.001f) return roll;
   return mul(matrix(shortestArc(roll.apply({1,0,0}),toWrist)),roll);
 }
+// Swing a rigid segment around its origin by the smallest angle that puts
+// its endpoint within the remaining chain's reach of the target.
+inline Vec reachJoint(Vec segment, Vec target, float reach) {
+  const float span=length(segment), distance=length(target);
+  if (length(target-segment)<=reach || span<.001f || distance<.001f) return segment;
+  const Vec direction=target*(1.f/distance);
+  const float cosine=std::clamp((span*span+distance*distance-reach*reach)/
+                                (2*span*distance),-1.f,1.f);
+  Vec side=segment-direction*dot(segment,direction);
+  if (length(side)<.001f)
+    side=cross(direction,std::abs(direction.x)<.8f ? Vec{1,0,0} : Vec{0,1,0});
+  return (direction*cosine+normal(side)*std::sqrt(std::max(0.f,1-cosine*cosine)))*span;
+}
 // Solve in world space using the animated elbow as the bend-plane guide.
 // Only rotations are returned to the skeleton. Both bone lengths stay authored.
 inline bool contactArm(const Transform &parent, Transform &upper, Transform &fore,
